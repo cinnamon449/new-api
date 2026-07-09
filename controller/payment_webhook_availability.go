@@ -108,3 +108,18 @@ func isEpayWebhookConfigured() bool {
 func isEpayWebhookEnabled() bool {
 	return isEpayTopUpEnabled()
 }
+
+func isPlisioTopUpEnabled() bool {
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	return strings.TrimSpace(setting.PlisioApiKey) != ""
+}
+
+func isPlisioWebhookConfigured() bool {
+	return strings.TrimSpace(setting.PlisioApiKey) != ""
+}
+
+func isPlisioWebhookEnabled() bool {
+	return isPlisioTopUpEnabled()
+}

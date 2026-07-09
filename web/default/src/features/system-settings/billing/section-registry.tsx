@@ -152,6 +152,9 @@ const BILLING_SECTIONS = [
           CreemWebhookSecret: settings.CreemWebhookSecret,
           CreemTestMode: settings.CreemTestMode,
           CreemProducts: settings.CreemProducts,
+          PlisioApiKey: settings.PlisioApiKey,
+          PlisioSourceCurrency: settings.PlisioSourceCurrency ?? 'USD',
+          PlisioMinTopUp: settings.PlisioMinTopUp ?? 1,
         }}
         waffoDefaultValues={{
           WaffoEnabled: settings.WaffoEnabled ?? false,

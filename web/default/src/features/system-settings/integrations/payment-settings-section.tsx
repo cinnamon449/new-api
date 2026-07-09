@@ -176,6 +176,9 @@ const paymentSchema = z.object({
   WaffoPancakeMerchantID: z.string(),
   WaffoPancakePrivateKey: z.string(),
   WaffoPancakeReturnURL: z.string(),
+  PlisioApiKey: z.string(),
+  PlisioSourceCurrency: z.string(),
+  PlisioMinTopUp: z.coerce.number().min(1),
 })
 
 type PaymentFormValues = z.infer<typeof paymentSchema>
@@ -457,6 +460,9 @@ export function PaymentSettingsSection({
       WaffoPancakeReturnURL: removeTrailingSlash(
         values.WaffoPancakeReturnURL.trim()
       ),
+      PlisioApiKey: values.PlisioApiKey.trim(),
+      PlisioSourceCurrency: values.PlisioSourceCurrency.trim() || 'USD',
+      PlisioMinTopUp: values.PlisioMinTopUp,
     }
 
     const initial = {
@@ -504,6 +510,10 @@ export function PaymentSettingsSection({
       WaffoPancakeReturnURL: removeTrailingSlash(
         initialRef.current.WaffoPancakeReturnURL.trim()
       ),
+      PlisioApiKey: initialRef.current.PlisioApiKey.trim(),
+      PlisioSourceCurrency:
+        initialRef.current.PlisioSourceCurrency.trim() || 'USD',
+      PlisioMinTopUp: initialRef.current.PlisioMinTopUp,
     }
 
     const updates: Array<{ key: string; value: string | number | boolean }> = []
@@ -701,6 +711,21 @@ export function PaymentSettingsSection({
       updates.push({ key: 'WaffoPayMethods', value: sanitized.WaffoPayMethods })
     }
 
+    if (sanitized.PlisioApiKey && sanitized.PlisioApiKey !== initial.PlisioApiKey) {
+      updates.push({ key: 'PlisioApiKey', value: sanitized.PlisioApiKey })
+    }
+
+    if (sanitized.PlisioSourceCurrency !== initial.PlisioSourceCurrency) {
+      updates.push({
+        key: 'PlisioSourceCurrency',
+        value: sanitized.PlisioSourceCurrency,
+      })
+    }
+
+    if (sanitized.PlisioMinTopUp !== initial.PlisioMinTopUp) {
+      updates.push({ key: 'PlisioMinTopUp', value: sanitized.PlisioMinTopUp })
+    }
+
     const hasWaffoPancakeChanges =
       sanitized.WaffoPancakeMerchantID !== initial.WaffoPancakeMerchantID ||
       sanitized.WaffoPancakePrivateKey.length > 0 ||
@@ -877,11 +902,12 @@ export function PaymentSettingsSection({
           />
           <Tabs defaultValue='general' className='min-w-0'>
             <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[44rem] grid-cols-6'>
+              <TabsList className='grid min-w-[44rem] grid-cols-7'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
+                <TabsTrigger value='plisio'>Plisio</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
                 <TabsTrigger value='waffo'>Waffo</TabsTrigger>
               </TabsList>
@@ -1580,6 +1606,114 @@ export function PaymentSettingsSection({
                       </FormControl>
                       <FormDescription>
                         {t('Configure Creem products. Provide a JSON array.')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value='plisio' className={paymentTabContentClassName}>
+              <div className='space-y-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>
+                    {t('Plisio Gateway')}
+                  </h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t('Configuration for Plisio cryptocurrency payments')}
+                  </p>
+                </div>
+
+                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+                  <p className='mb-2 font-medium'>
+                    {t('Webhook Configuration:')}
+                  </p>
+                  <ul className='list-inside list-disc space-y-1'>
+                    <li>
+                      {t('Webhook URL:')}{' '}
+                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                        {'<ServerAddress>/api/plisio/webhook'}
+                      </code>
+                    </li>
+                    <li>
+                      {t(
+                        'Customers pay with Bitcoin, Ethereum, USDT and other cryptocurrencies'
+                      )}
+                    </li>
+                  </ul>
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='PlisioApiKey'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('API Key')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='password'
+                            placeholder={t('Enter Plisio API key')}
+                            autoComplete='new-password'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Plisio secret key (leave blank unless updating)'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='PlisioSourceCurrency'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Source Currency')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='USD'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Fiat currency used to charge customers (converted to crypto at checkout)'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name='PlisioMinTopUp'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Minimum top-up')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='number'
+                          step='0.01'
+                          min={1}
+                          {...safeNumberFieldProps(field)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Smallest amount users can recharge (Plisio)')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

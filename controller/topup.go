@@ -95,12 +95,35 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	// 如果启用了 Plisio 加密货币支付，添加到支付方法列表
+	enablePlisio := isPlisioTopUpEnabled()
+	if enablePlisio {
+		hasPlisio := false
+		for _, method := range payMethods {
+			if method["type"] == model.PaymentMethodPlisio {
+				hasPlisio = true
+				break
+			}
+		}
+
+		if !hasPlisio {
+			plisioMethod := map[string]string{
+				"name":      "Plisio (Crypto)",
+				"type":      model.PaymentMethodPlisio,
+				"color":     "rgba(var(--semi-indigo-5), 1)",
+				"min_topup": strconv.Itoa(setting.PlisioMinTopUp),
+			}
+			payMethods = append(payMethods, plisioMethod)
+		}
+	}
+
 	data := gin.H{
 		"enable_online_topup":              isEpayTopUpEnabled(),
 		"enable_stripe_topup":              isStripeTopUpEnabled(),
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
+		"enable_plisio_topup":              enablePlisio,
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,
@@ -116,6 +139,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"stripe_min_topup":        setting.StripeMinTopUp,
 		"waffo_min_topup":         setting.WaffoMinTopUp,
 		"waffo_pancake_min_topup": setting.WaffoPancakeMinTopUp,
+		"plisio_min_topup":        setting.PlisioMinTopUp,
 		"amount_options":          operation_setting.GetPaymentSetting().AmountOptions,
 		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
 		"topup_link":              common.TopUpLink,

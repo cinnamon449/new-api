@@ -93,6 +93,9 @@ func InitOptionMap() {
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
 	common.OptionMap["CreemWebhookSecret"] = setting.CreemWebhookSecret
+	common.OptionMap["PlisioApiKey"] = setting.PlisioApiKey
+	common.OptionMap["PlisioSourceCurrency"] = setting.PlisioSourceCurrency
+	common.OptionMap["PlisioMinTopUp"] = strconv.Itoa(setting.PlisioMinTopUp)
 	common.OptionMap["WaffoEnabled"] = strconv.FormatBool(setting.WaffoEnabled)
 	common.OptionMap["WaffoApiKey"] = setting.WaffoApiKey
 	common.OptionMap["WaffoPrivateKey"] = setting.WaffoPrivateKey
@@ -424,6 +427,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.CreemTestMode = value == "true"
 	case "CreemWebhookSecret":
 		setting.CreemWebhookSecret = value
+	case "PlisioApiKey":
+		setting.PlisioApiKey = value
+	case "PlisioSourceCurrency":
+		setting.PlisioSourceCurrency = value
+	case "PlisioMinTopUp":
+		setting.PlisioMinTopUp, _ = strconv.Atoi(value)
 	case "WaffoEnabled":
 		setting.WaffoEnabled = value == "true"
 	case "WaffoApiKey":

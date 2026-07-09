@@ -39,6 +39,8 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  PlisioPaymentRequest,
+  PlisioPaymentResponse,
 } from './types'
 
 // ============================================================================
@@ -164,6 +166,18 @@ export async function requestWaffoPancakePayment(
   request: WaffoPancakePaymentRequest
 ): Promise<WaffoPancakePaymentResponse> {
   const res = await api.post('/api/user/waffo-pancake/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
+ * Request Plisio (crypto) payment
+ */
+export async function requestPlisioPayment(
+  request: PlisioPaymentRequest
+): Promise<PlisioPaymentResponse> {
+  const res = await api.post('/api/user/plisio/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data

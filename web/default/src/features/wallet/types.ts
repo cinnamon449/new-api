@@ -39,6 +39,10 @@ export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
+export type PlisioPaymentResponse = ApiResponse<{
+  invoice_url: string
+  order_id?: string
+}>
 export type AffiliateCodeResponse = ApiResponse<string>
 export type AffiliateTransferResponse = ApiResponse
 export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
@@ -150,6 +154,10 @@ export interface TopupInfo {
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
+  /** Whether Plisio (crypto) topup is enabled */
+  enable_plisio_topup?: boolean
+  /** Minimum topup amount for Plisio */
+  plisio_min_topup?: number
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
@@ -202,6 +210,16 @@ export interface WaffoPaymentRequest {
 export interface WaffoPancakePaymentRequest {
   /** Topup amount */
   amount: number
+}
+
+/**
+ * Plisio (crypto) payment request parameters
+ */
+export interface PlisioPaymentRequest {
+  /** Topup amount */
+  amount: number
+  /** Payment method identifier */
+  payment_method: 'plisio'
 }
 
 /**

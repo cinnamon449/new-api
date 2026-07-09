@@ -87,6 +87,15 @@ export function isWaffoPancakePayment(paymentType: string): boolean {
 }
 
 /**
+ * Check if payment method is Plisio (crypto). Plisio returns a hosted invoice
+ * URL the buyer is redirected to (like Stripe's pay_link / Creem's
+ * checkout_url), so it goes through a dedicated redirect flow.
+ */
+export function isPlisioPayment(paymentType: string): boolean {
+  return paymentType === PAYMENT_TYPES.PLISIO
+}
+
+/**
  * Get default payment type from topup info
  */
 export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
@@ -109,6 +118,10 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
 
   if (topupInfo.enable_waffo_pancake_topup) {
     return PAYMENT_TYPES.WAFFO_PANCAKE
+  }
+
+  if (topupInfo.enable_plisio_topup) {
+    return PAYMENT_TYPES.PLISIO
   }
 
   return DEFAULT_PAYMENT_TYPE
@@ -136,6 +149,10 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
 
   if (topupInfo.enable_waffo_pancake_topup) {
     return topupInfo.waffo_pancake_min_topup || DEFAULT_MIN_TOPUP
+  }
+
+  if (topupInfo.enable_plisio_topup) {
+    return topupInfo.plisio_min_topup || DEFAULT_MIN_TOPUP
   }
 
   return DEFAULT_MIN_TOPUP
