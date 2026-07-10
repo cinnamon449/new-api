@@ -4838,6 +4838,7 @@
     "Used to authenticate with io.net deployment API": "用于 io.net 部署 API 鉴权",
     "Used to authenticate with the worker. Leave blank to keep the existing secret.": "用于与 Worker 进行身份验证。留空以保留现有密钥。",
     "Used to decide the payment flow. Built-in keys include stripe for Stripe and waffo_pancake for Waffo Pancake; other values are sent to Epay as the type parameter.": "用于决定点击后走哪个支付流程。stripe 走 Stripe，waffo_pancake 走 Waffo Pancake；其他值会作为 Epay 的 type 参数提交。",
+    "Used to decide the payment flow. Built-in keys include stripe for Stripe, waffo_pancake for Waffo Pancake, and plisio for Plisio; other values are sent to Epay as the type parameter.": "用于决定支付流程。内置 key 包括 stripe（Stripe）、waffo_pancake（Waffo Pancake）和 plisio（Plisio）；其他值将作为 type 参数发送给易支付。",
     "Used:": "已使用：",
     "User": "用户",
     "User {{id}}": "用户 {{id}}",

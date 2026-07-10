@@ -47,6 +47,7 @@ const PAYMENT_TYPE_ICON_NAMES: Record<string, string> = {
   alipay: 'SiAlipay',
   stripe: 'SiStripe',
   waffo_pancake: 'LuCreditCard',
+  plisio: 'LuCreditCard',
   wxpay: 'SiWechat',
 }
 
@@ -95,6 +96,14 @@ export function PaymentMethodsVisualEditor({
         icon: getDefaultIconName('waffo_pancake'),
         name: 'Waffo Pancake',
         type: 'waffo_pancake',
+      },
+    },
+    {
+      name: 'Plisio',
+      template: {
+        icon: getDefaultIconName('plisio'),
+        name: 'Plisio (Crypto)',
+        type: 'plisio',
       },
     },
     {

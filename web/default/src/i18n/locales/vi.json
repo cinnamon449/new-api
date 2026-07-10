@@ -4838,6 +4838,7 @@
     "Used to authenticate with io.net deployment API": "Dùng để xác thực với API triển khai io.net",
     "Used to authenticate with the worker. Leave blank to keep the existing secret.": "Dùng để xác thực với worker. Để trống để giữ nguyên secret hiện có.",
     "Used to decide the payment flow. Built-in keys include stripe for Stripe and waffo_pancake for Waffo Pancake; other values are sent to Epay as the type parameter.": "Dùng để quyết định luồng thanh toán khi người dùng nhấp. Các khóa có sẵn gồm stripe cho Stripe và waffo_pancake cho Waffo Pancake; các giá trị khác được gửi tới Epay dưới dạng tham số type.",
+    "Used to decide the payment flow. Built-in keys include stripe for Stripe, waffo_pancake for Waffo Pancake, and plisio for Plisio; other values are sent to Epay as the type parameter.": "Quyết định luồng thanh toán. Các khóa tích hợp: stripe (Stripe), waffo_pancake (Waffo Pancake) và plisio (Plisio); các giá trị khác được gửi cho Epay dưới dạng tham số type.",
     "Used:": "Đã dùng:",
     "User": "Người dùng",
     "User {{id}}": "Người dùng {{id}}",
