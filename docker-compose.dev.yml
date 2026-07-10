@@ -59,6 +59,8 @@ services:
       POSTGRES_DB: new-api
     volumes:
       - dev_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     networks:
       - dev-network
     healthcheck:
