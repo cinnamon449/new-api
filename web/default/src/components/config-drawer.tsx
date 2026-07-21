@@ -320,6 +320,7 @@ const FONT_OPTIONS: {
   preview?: string
 }[] = [
   { value: 'default', label: 'Auto', preview: undefined },
+  { value: 'mono', label: 'Mono', preview: 'var(--font-mono)' },
   { value: 'sans', label: 'Sans', preview: 'var(--font-sans)' },
   { value: 'serif', label: 'Serif', preview: 'var(--font-serif)' },
 ]
@@ -337,7 +338,7 @@ function FontConfig() {
       <Radio
         value={customization.font}
         onValueChange={(v) => setFont(v as ThemeFont)}
-        className='grid w-full grid-cols-3 gap-4'
+        className='grid w-full grid-cols-4 gap-4'
         aria-label={t('Select body font')}
       >
         {FONT_OPTIONS.map((option) => (

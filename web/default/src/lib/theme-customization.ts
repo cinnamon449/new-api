@@ -87,17 +87,22 @@ export type ContentLayout = 'full' | 'centered'
 /**
  * Font axis for the theme.
  *
- * - `default` — resolve at runtime from the active preset
- *   (see `PRESET_DEFAULT_FONT`). The shipped `default` and `anthropic`
- *   presets resolve to serif; other named color presets fall back to
- *   sans unless they list a different choice. Mirrors how
- *   `radius: 'default'` defers to a per-preset hint.
- * - `sans` — humanist sans (Public Sans), the project's UI fallback.
- * - `serif` — editorial serif (Lora + CJK fallbacks), the project's
- *   "soul" typography. Inherits across the whole UI; monospace contexts
- *   keep their own family via Tailwind preflight and `.font-mono`.
+ * - `default` - resolve at runtime from the active preset
+ *   (see `PRESET_DEFAULT_FONT`). The shipped `default` preset resolves to
+ *   mono (OpenCode terminal aesthetic); `anthropic` resolves to serif.
+ *   Other named color presets fall back to mono unless they list a
+ *   different choice. Mirrors how `radius: 'default'` defers to a
+ *   per-preset hint.
+ * - `mono` - monospace (Berkeley Mono / IBM Plex Mono), the project's
+ *   OpenCode default. Tabular figures are enabled globally so numeric
+ *   columns align like a terminal.
+ * - `sans` - humanist sans (Public Sans), the traditional UI fallback.
+ * - `serif` - editorial serif (Lora + CJK fallbacks), the Anthropic
+ *   preset's signature typography. Inherits across the whole UI;
+ *   monospace contexts keep their own family via Tailwind preflight
+ *   and `.font-mono`.
  */
-export type ThemeFont = 'default' | 'sans' | 'serif'
+export type ThemeFont = 'default' | 'mono' | 'sans' | 'serif'
 
 /**
  * The resolved (non-`default`) font value applied to the DOM. The provider
@@ -129,6 +134,7 @@ export const THEME_PRESET_VALUES = new Set(
 
 export const THEME_FONT_VALUES: ReadonlySet<ThemeFont> = new Set([
   'default',
+  'mono',
   'sans',
   'serif',
 ])
@@ -168,15 +174,14 @@ export const THEME_COOKIE_KEYS = {
  *
  * Co-located with the preset registry so a preset's signature typography
  * is declared in one place. Presets not listed here fall back to the
- * `resolveThemeFont` default of `sans`. The shipped `default` preset
- * opts into serif so the editorial Lora voice is the out-of-the-box
- * experience; vivid color presets stay on the humanist sans so their
- * accents read clearly without competing with the body type.
+ * `resolveThemeFont` default of `mono`. The shipped `default` preset
+ * opts into mono so the OpenCode terminal aesthetic is the out-of-the-box
+ * experience; the `anthropic` preset keeps the editorial Lora serif.
  */
 export const PRESET_DEFAULT_FONT: Partial<
   Record<ThemePreset, ResolvedThemeFont>
 > = {
-  default: 'sans',
+  default: 'mono',
   anthropic: 'serif',
 }
 
@@ -191,7 +196,7 @@ export function resolveThemeFont(
   preset: ThemePreset
 ): ResolvedThemeFont {
   if (font === 'default') {
-    return PRESET_DEFAULT_FONT[preset] ?? 'sans'
+    return PRESET_DEFAULT_FONT[preset] ?? 'mono'
   }
   return font
 }

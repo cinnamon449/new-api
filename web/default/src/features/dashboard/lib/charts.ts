@@ -16,8 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { dataScheme as vchartDefaultDataScheme } from '@visactor/vchart/esm/theme/color-scheme/builtin/default'
-
 import { MAX_CHART_TREND_POINTS } from '@/features/dashboard/constants'
 import type {
   QuotaDataItem,
@@ -40,14 +38,29 @@ type TooltipLineItem = {
 }
 
 export function getDashboardChartColors(domainLength: number): string[] {
-  const scheme =
-    vchartDefaultDataScheme.find(
-      (item) => !item.maxDomainLength || domainLength <= item.maxDomainLength
-    ) ?? vchartDefaultDataScheme[vchartDefaultDataScheme.length - 1]
-
-  return scheme.scheme.filter(
-    (color): color is string => typeof color === 'string'
-  )
+  // Read the OpenCode chart palette from CSS variables so series colors
+  // follow the active theme (light/dark) automatically. Falls back to
+  // hardcoded values when CSS variables are unavailable (SSR).
+  let palette: string[]
+  if (typeof document !== 'undefined') {
+    const styles = getComputedStyle(document.documentElement)
+    const fromCss = [
+      styles.getPropertyValue('--chart-1').trim(),
+      styles.getPropertyValue('--chart-2').trim(),
+      styles.getPropertyValue('--chart-3').trim(),
+      styles.getPropertyValue('--chart-4').trim(),
+      styles.getPropertyValue('--chart-5').trim(),
+    ].filter(Boolean)
+    palette = fromCss.length > 0 ? fromCss : ['#3a8bff', '#30d158', '#ff9f0a', '#ff3b30', '#bf5af2']
+  } else {
+    // Fallback: OpenCode accent palette (dark-mode variants, visible on both modes)
+    palette = ['#3a8bff', '#30d158', '#ff9f0a', '#ff3b30', '#bf5af2']
+  }
+  const colors: string[] = []
+  for (let i = 0; i < domainLength; i++) {
+    colors.push(palette[i % palette.length])
+  }
+  return colors
 }
 
 function renderQuotaCompat(rawQuota: number, digits = 4): string {

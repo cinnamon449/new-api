@@ -26,13 +26,6 @@ For commercial licensing, please contact support@quantumnous.com
  * that activates it. Loaded globally so font-switching is instantaneous
  * with no FOUT once the variable is fetched. */
 @import '@fontsource-variable/lora';
-/* IBM Plex Mono backs the OpenCode `mono` font axis, the project default.
- * Berkeley Mono (paid) is first in the stack; this free OFL fallback loads
- * the 400/500/600/700 weights used across the UI. */
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
-@import '@fontsource/ibm-plex-mono/600.css';
-@import '@fontsource/ibm-plex-mono/700.css';
 
 @import './theme.css';
 @import './theme-presets.css';
@@ -61,10 +54,7 @@ For commercial licensing, please contact support@quantumnous.com
     scrollbar-color: var(--border) transparent;
   }
   html {
-    @apply overflow-x-hidden font-mono;
-    /* Tabular figures on all numeric surfaces, the OpenCode default.
-     * Aligns quotas, tokens, latencies, and balances like a terminal. */
-    font-feature-settings: 'tnum' 1, 'zero' 1;
+    @apply overflow-x-hidden font-sans;
   }
   body {
     @apply bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar min-h-svh w-full;
@@ -492,18 +482,22 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
-/* Micro-interactions, OpenCode flat style, no shadows */
+/* Micro-interactions — Vercel-style subtle hover/active feedback */
 @media (prefers-reduced-motion: no-preference) {
   [data-slot='card']:not([data-card-hover='false']) {
     transition:
       transform 150ms ease,
-      border-color 150ms ease;
+      box-shadow 150ms ease;
   }
 
   @media (min-width: 641px) {
     [data-slot='card']:not([data-card-hover='false']):hover {
       transform: translateY(-1px);
-      border-color: color-mix(in oklch, var(--foreground) 15%, var(--border));
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.06);
+    }
+
+    .dark [data-slot='card']:not([data-card-hover='false']):hover {
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
     }
   }
 

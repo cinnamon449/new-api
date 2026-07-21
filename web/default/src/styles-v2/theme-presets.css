@@ -627,12 +627,6 @@ For commercial licensing, please contact support@quantumnous.com
 [data-theme-font='serif'] {
   --font-body: var(--font-serif);
 }
-[data-theme-font='mono'] {
-  --font-body: var(--font-mono);
-  /* Tabular figures everywhere when mono is active, the OpenCode default.
-   * Aligns quotas, tokens, latencies, and balances like a terminal. */
-  font-feature-settings: 'tnum' 1, 'zero' 1;
-}
 
 /* ── Serif typography refinements ────────────────────────────────────────
  * When the body runs in serif, three things happen:
