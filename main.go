@@ -52,6 +52,12 @@ var classicBuildFS embed.FS
 //go:embed web/classic/dist/index.html
 var classicIndexPage []byte
 
+//go:embed web/interapi/dist
+var interapiBuildFS embed.FS
+
+//go:embed web/interapi/dist/index.html
+var interapiIndexPage []byte
+
 func main() {
 	startTime := time.Now()
 
@@ -208,6 +214,8 @@ func main() {
 		DefaultIndexPage: indexPage,
 		ClassicBuildFS:   classicBuildFS,
 		ClassicIndexPage: classicIndexPage,
+		InterapiBuildFS:  interapiBuildFS,
+		InterapiIndexPage: interapiIndexPage,
 	})
 	var port = os.Getenv("PORT")
 	if port == "" {
@@ -267,6 +275,7 @@ func InjectUmamiAnalytics() {
 	placeholder := []byte("<!--umami-->\n")
 	indexPage = bytes.ReplaceAll(indexPage, placeholder, analyticsInject)
 	classicIndexPage = bytes.ReplaceAll(classicIndexPage, placeholder, analyticsInject)
+	interapiIndexPage = bytes.ReplaceAll(interapiIndexPage, placeholder, analyticsInject)
 }
 
 func InjectGoogleAnalytics() {
@@ -291,6 +300,7 @@ func InjectGoogleAnalytics() {
 	placeholder := []byte("<!--Google Analytics-->\n")
 	indexPage = bytes.ReplaceAll(indexPage, placeholder, analyticsInject)
 	classicIndexPage = bytes.ReplaceAll(classicIndexPage, placeholder, analyticsInject)
+	interapiIndexPage = bytes.ReplaceAll(interapiIndexPage, placeholder, analyticsInject)
 }
 
 func InitResources() error {

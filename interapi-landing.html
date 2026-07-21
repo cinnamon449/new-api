@@ -1,0 +1,679 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InterAPI · Private AI Infrastructure — One Key, Every Model</title>
+<style>
+  /* ─── tokens (bound to OpenCode design system) ─────────────────────
+     Warm near-black canvas, Berkeley Mono as the sole typeface, flat
+     depth (no shadows), Apple HIG semantic colors. Hex lives ONLY here. */
+  :root {
+    --bg:        #121212;   /* near-black canvas */
+    --surface:   #121212;   /* matched to bg — flat */
+    --surface-2: #1a1a1a;   /* subtle panel surface on the darker bg */
+    --fg:        #fdfcfc;   /* barely-warm off-white */
+    --fg-2:      #c8c6c4;   /* warm light gray */
+    --muted:     #9a9898;   /* mid warm gray */
+    --meta:      #6e6e73;   /* muted labels */
+    --border:    #464343;   /* warm dark border */
+    --border-soft:#3a3737;  /* barely-visible inner separator */
+
+    --accent:        #007aff;   /* Apple system blue */
+    --accent-on:     #ffffff;
+    --accent-hover:  #0056b3;
+    --accent-active: #004085;
+
+    --success: #30d158;  --warn: #ff9f0a;  --danger: #ff3b30;
+
+    --font-display: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --font-body:    "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --font-mono:    "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+    /* derived */
+    --accent-soft: color-mix(in oklch, var(--accent) 16%, transparent);
+    --fg-soft:     color-mix(in oklch, var(--fg) 5%, transparent);
+    --success-soft:color-mix(in oklch, var(--success) 16%, transparent);
+
+    --fs-h1: clamp(40px, 6vw, 68px);
+    --fs-h2: clamp(28px, 3.6vw, 42px);
+    --fs-h3: 19px;
+    --fs-lead: 18px;
+    --fs-body: 15px;
+    --fs-meta: 13px;
+
+    --gap-xs: 8px; --gap-sm: 12px; --gap-md: 20px;
+    --gap-lg: 32px; --gap-xl: 56px; --gap-2xl: 96px;
+    --container: 1080px; --gutter: 28px;
+
+    --radius: 4px;     /* OpenCode default — sharp, utilitarian */
+    --radius-lg: 6px;
+  }
+
+  /* ─── reset & base ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: var(--font-body); font-size: var(--fs-body);
+    line-height: 1.55; text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  img, svg { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; cursor: pointer; }
+  p { text-wrap: pretty; margin: 0; }
+  h1, h2, h3, h4 { text-wrap: balance; margin: 0; font-weight: 700; }
+  ::selection { background: var(--accent-soft); }
+
+  /* ─── layout primitives ────────────────────────────────────────── */
+  .container { max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
+  .section { padding-block: clamp(56px, 9vw, var(--gap-2xl)); }
+  .section + .section { border-top: 1px solid var(--border-soft); }
+  .stack { display: flex; flex-direction: column; }
+  .stack > * + * { margin-top: var(--gap-md); }
+  .row { display: flex; align-items: center; gap: var(--gap-md); }
+  .row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-md); }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gap-lg); }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap-lg); }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap-md); }
+
+  /* ─── type ─────────────────────────────────────────────────────── */
+  .h1, h1 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: 1.04; letter-spacing: -0.02em; }
+  .h2, h2 { font-family: var(--font-display); font-size: var(--fs-h2); line-height: 1.08; letter-spacing: -0.015em; }
+  .h3, h3 { font-size: var(--fs-h3); font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+  .lead { font-size: var(--fs-lead); line-height: 1.55; color: var(--fg-2); max-width: 58ch; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    margin: 0 0 var(--gap-md);
+  }
+  .meta { font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--muted); }
+  .num  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  code, .mono { font-family: var(--font-mono); }
+
+  /* ─── chrome: nav + footer ─────────────────────────────────────── */
+  .topnav {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in oklch, var(--bg) 86%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .topnav-inner { display: flex; align-items: center; justify-content: space-between; padding-block: 14px; gap: var(--gap-lg); }
+  .topnav .logo { font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.01em; display: inline-flex; align-items: center; gap: 8px; }
+  .topnav .logo .glyph { color: var(--accent); }
+  .topnav nav { display: flex; gap: var(--gap-lg); }
+  .topnav nav a { font-family: var(--font-mono); font-size: 14px; color: var(--muted); }
+  .topnav nav a:hover { color: var(--fg); }
+  .pagefoot { padding-block: var(--gap-xl); color: var(--muted); font-size: 13px; border-top: 1px solid var(--border-soft); font-family: var(--font-mono); }
+  .pagefoot .row-between { flex-wrap: wrap; gap: var(--gap-md); }
+  .pagefoot a { color: var(--muted); }
+  .pagefoot a:hover { color: var(--fg); }
+
+  /* ─── buttons ──────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: var(--radius);
+    border: 1px solid transparent;
+    font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+    letter-spacing: -0.005em; line-height: 1;
+    transition: background var(--motion-fast, 100ms) ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-primary:active { background: var(--accent-active); }
+  .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+  .btn-secondary:hover { border-color: var(--fg-2); }
+  .btn-ghost { background: transparent; color: var(--fg-2); border-color: transparent; padding-inline: 6px; }
+  .btn-ghost:hover { color: var(--accent); }
+  .btn-arrow::after { content: '→'; transition: transform 0.15s ease; }
+  .btn-arrow:hover::after { transform: translateX(2px); }
+
+  /* ─── card / surface ───────────────────────────────────────────── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
+
+  /* ─── pill / tag ───────────────────────────────────────────────── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; background: var(--accent-soft); color: var(--accent);
+    border-radius: var(--radius); font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .tag {
+    display: inline-flex; align-items: center; padding: 3px 9px;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+  }
+  .tag-ok { color: var(--success); border-color: color-mix(in oklch, var(--success) 40%, transparent); }
+
+  /* ─── rule ─────────────────────────────────────────────────────── */
+  .rule { border: 0; border-top: 1px solid var(--border-soft); margin: 0; }
+
+  /* ─── hero ─────────────────────────────────────────────────────── */
+  .hero { padding-block: clamp(64px, 9vw, 120px); }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--gap-2xl); align-items: center; }
+  .hero h1 { margin-bottom: var(--gap-md); }
+  .hero .lead { margin-bottom: var(--gap-lg); }
+  .hero-cta { display: inline-flex; gap: var(--gap-sm); flex-wrap: wrap; }
+  .hero-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--gap-lg); }
+  .hero-tags .tag { text-transform: none; letter-spacing: 0; font-size: 12px; }
+
+  /* ─── terminal (hero flourish) ─────────────────────────────────── */
+  .term {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+    font-family: var(--font-mono);
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--muted); font-size: 12px; letter-spacing: 0.02em;
+  }
+  .term-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); }
+  .term-path { color: var(--fg-2); }
+  .term-tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border-soft); overflow-x: auto; scrollbar-width: none; }
+  .term-tabs::-webkit-scrollbar { display: none; }
+  .term-tab {
+    appearance: none; background: transparent; border: 0;
+    padding: 10px 12px; color: var(--muted); cursor: pointer;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.02em;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .term-tab:hover { color: var(--fg-2); }
+  .term-tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+  .term-body {
+    margin: 0; padding: 18px 20px; min-height: 232px;
+    font-size: 12.5px; line-height: 1.7; color: var(--fg-2);
+    white-space: pre-wrap; word-break: break-word; overflow-x: auto;
+  }
+  .t-prompt { color: var(--accent); }
+  .t-key { color: var(--success); }
+  .t-model { color: var(--warn); }
+  .t-out { color: var(--fg); }
+  .t-ok { color: var(--success); }
+  .caret { display: inline-block; width: 7px; height: 14px; background: var(--accent); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ─── provider grid ────────────────────────────────────────────── */
+  .prov-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border-soft); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); overflow: hidden; }
+  .prov-cell { background: var(--bg); padding: 22px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .prov-cell .prov-name { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--fg); display: flex; align-items: center; justify-content: space-between; }
+  .prov-cell .prov-meta { font-family: var(--font-mono); font-size: 11px; color: var(--meta); letter-spacing: 0.04em; text-transform: uppercase; }
+  .prov-models { display: flex; flex-direction: column; gap: 4px; }
+  .prov-models .m { font-family: var(--font-mono); font-size: 13px; color: var(--fg-2); }
+  .prov-models .m span { color: var(--meta); }
+
+  /* ─── privacy grid ─────────────────────────────────────────────── */
+  .priv-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border-soft); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); overflow: hidden; }
+  .priv-cell { background: var(--bg); padding: 26px 24px; }
+  .priv-cell .priv-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .priv-cell .priv-mark { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid color-mix(in oklch, var(--success) 45%, transparent); border-radius: var(--radius); color: var(--success); flex: none; }
+  .priv-cell .priv-mark svg { width: 14px; height: 14px; }
+  .priv-cell h3 { font-size: 17px; }
+  .priv-cell p { color: var(--fg-2); font-size: 14px; line-height: 1.55; }
+  .priv-cell .priv-kw { color: var(--success); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* ─── compatibility ────────────────────────────────────────────── */
+  .compat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--gap-md); }
+  .compat-cell { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+  .compat-cell .compat-name { font-family: var(--font-display); font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
+  .compat-cell .compat-name .compat-tag { font-family: var(--font-mono); font-size: 10px; color: var(--meta); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
+  .compat-cell pre { margin: 14px 0 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.7; color: var(--fg-2); white-space: pre-wrap; word-break: break-word; }
+  .compat-cell pre .k { color: var(--accent); }
+  .compat-cell pre .v { color: var(--success); }
+
+  /* ─── feature cell ─────────────────────────────────────────────── */
+  .feature .feature-mark {
+    width: 32px; height: 32px; display: grid; place-items: center;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--accent); margin-bottom: var(--gap-md);
+  }
+  .feature .feature-mark svg { width: 16px; height: 16px; }
+  .feature h3 { margin-bottom: 6px; }
+  .feature p { color: var(--fg-2); font-size: 14px; }
+
+  /* ─── pricing ──────────────────────────────────────────────────── */
+  .price-head { text-align: center; max-width: 40ch; margin: 0 auto var(--gap-xl); }
+  .price-stmt { font-family: var(--font-display); font-size: clamp(24px, 3vw, 34px); line-height: 1.15; letter-spacing: -0.01em; color: var(--fg); }
+  .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border-soft); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); overflow: hidden; }
+  .price-cell { background: var(--bg); padding: 26px 22px; }
+  .price-cell .step { font-family: var(--font-mono); font-size: 11px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .price-cell h3 { font-size: 17px; margin-bottom: 8px; }
+  .price-cell p { color: var(--fg-2); font-size: 14px; }
+  .price-note { margin-top: var(--gap-lg); font-family: var(--font-mono); font-size: 13px; color: var(--muted); text-align: center; }
+  .price-note strong { color: var(--fg); font-weight: 700; }
+
+  /* ─── cta strip ────────────────────────────────────────────────── */
+  .cta-strip { text-align: center; }
+  .cta-strip .container { max-width: 640px; }
+  .cta-strip h2 { margin-bottom: var(--gap-md); }
+  .cta-strip .lead { margin: 0 auto var(--gap-lg); color: var(--muted); }
+
+  /* ─── responsive ───────────────────────────────────────────────── */
+  @media (max-width: 920px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .hero-grid { grid-template-columns: 1fr; gap: var(--gap-xl); }
+    .prov-grid { grid-template-columns: repeat(2, 1fr); }
+    .priv-grid { grid-template-columns: 1fr; }
+    .price-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 620px) {
+    .prov-grid { grid-template-columns: 1fr; }
+    .topnav nav { display: none; }
+    .topnav-inner { justify-content: space-between; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .caret { animation: none; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <header class="topnav" data-od-id="topnav">
+    <div class="container topnav-inner">
+      <span class="logo"><span class="glyph">▢</span>InterAPI</span>
+      <nav aria-label="Primary">
+        <a href="#top" data-od-id="nav-home">Home</a>
+        <a href="#pricing" data-od-id="nav-pricing">Pricing</a>
+        <a href="#" data-od-id="nav-docs">Docs</a>
+        <a href="#" data-od-id="nav-blog">Blog</a>
+      </nav>
+      <a class="btn btn-primary" href="#" data-od-id="nav-console">Open Console</a>
+    </div>
+  </header>
+
+  <main id="content">
+
+    <!-- ─── 1 · HERO ─────────────────────────────────────────────── -->
+    <section class="section hero" id="top" data-od-id="hero">
+      <div class="container hero-grid">
+        <div>
+          <p class="eyebrow">// Private AI infrastructure</p>
+          <h1>Many models.<br />One key.<br />Zero tracking.</h1>
+          <p class="lead">One endpoint and one key for every major model — OpenAI, Anthropic, Google, DeepSeek, Z.ai. No email to sign up, no logs stored, no identity on the wire. Pay in Monero.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="#" data-od-id="hero-console">Open Console</a>
+            <a class="btn btn-ghost btn-arrow" href="#pricing" data-od-id="hero-pricing">See how pricing works</a>
+          </div>
+          <div class="hero-tags">
+            <span class="tag">No email</span>
+            <span class="tag">No logs</span>
+            <span class="tag">XMR · BTC · ETH · USDT</span>
+            <span class="tag">OpenAI-compliant endpoint</span>
+          </div>
+        </div>
+
+        <div class="term" data-od-id="hero-terminal" aria-label="Interactive request demo">
+          <div class="term-bar">
+            <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+            <span class="term-path" id="termPath">interapi — /v1/chat/completions</span>
+          </div>
+          <div class="term-tabs" role="tablist" aria-label="Pick a model">
+            <button class="term-tab" role="tab" data-scenario="claude" aria-selected="true">claude</button>
+            <button class="term-tab" role="tab" data-scenario="gpt" aria-selected="false">gpt</button>
+            <button class="term-tab" role="tab" data-scenario="gemini" aria-selected="false">gemini</button>
+            <button class="term-tab" role="tab" data-scenario="deepseek" aria-selected="false">deepseek</button>
+            <button class="term-tab" role="tab" data-scenario="image" aria-selected="false">image</button>
+          </div>
+          <pre class="term-body" id="termBody"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 2 · PROVIDERS / MODELS ──────────────────────────────── -->
+    <section class="section" data-od-id="providers">
+      <div class="container stack" style="gap: 40px;">
+        <div class="row-between" style="align-items: flex-end; flex-wrap: wrap; gap: var(--gap-md);">
+          <div style="max-width: 46ch;">
+            <p class="eyebrow">// One key · every provider</p>
+            <h2>Five labs. One endpoint. Same key for all of them.</h2>
+          </div>
+          <p class="meta">swap the <code style="color:var(--warn);">model</code> field — nothing else</p>
+        </div>
+
+        <div class="prov-grid">
+          <div class="prov-cell" data-od-id="prov-openai">
+            <div class="prov-name">OpenAI <span class="prov-meta">chat · reasoning</span></div>
+            <div class="prov-models">
+              <span class="m">gpt-4.1 <span>· chat</span></span>
+              <span class="m">o3 <span>· reasoning</span></span>
+              <span class="m">gpt-4o <span>· multimodal</span></span>
+            </div>
+          </div>
+          <div class="prov-cell" data-od-id="prov-anthropic">
+            <div class="prov-name">Anthropic <span class="prov-meta">claude</span></div>
+            <div class="prov-models">
+              <span class="m">claude-opus-4-1 <span>· flagship</span></span>
+              <span class="m">claude-sonnet-4-5 <span>· balanced</span></span>
+              <span class="m">claude-haiku-4-5 <span>· fast</span></span>
+            </div>
+          </div>
+          <div class="prov-cell" data-od-id="prov-google">
+            <div class="prov-name">Google <span class="prov-meta">gemini · veo</span></div>
+            <div class="prov-models">
+              <span class="m">gemini-2.5-pro <span>· flagship</span></span>
+              <span class="m">gemini-2.5-flash <span>· fast</span></span>
+              <span class="m">veo-3 <span>· video</span></span>
+            </div>
+          </div>
+          <div class="prov-cell" data-od-id="prov-deepseek">
+            <div class="prov-name">DeepSeek <span class="prov-meta">open · cheap</span></div>
+            <div class="prov-models">
+              <span class="m">deepseek-v3.2 <span>· chat</span></span>
+              <span class="m">deepseek-r1 <span>· reasoning</span></span>
+              <span class="m">deepseek-coder <span>· code</span></span>
+            </div>
+          </div>
+          <div class="prov-cell" data-od-id="prov-zai">
+            <div class="prov-name">Z.ai <span class="prov-meta">glm</span></div>
+            <div class="prov-models">
+              <span class="m">glm-4.6 <span>· flagship</span></span>
+              <span class="m">glm-4.5v <span>· vision</span></span>
+              <span class="m">glm-air <span>· fast</span></span>
+            </div>
+          </div>
+          <div class="prov-cell" data-od-id="prov-image">
+            <div class="prov-name">Image &amp; media <span class="prov-meta">gen</span></div>
+            <div class="prov-models">
+              <span class="m">flux-1.1-pro <span>· image</span></span>
+              <span class="m">gpt-image-1 <span>· image</span></span>
+              <span class="m">imagen-4 <span>· image</span></span>
+            </div>
+          </div>
+        </div>
+        <p class="meta">Representative models per provider — live availability and per-model rates are listed in Console. New models land continuously.</p>
+      </div>
+    </section>
+
+    <!-- ─── 3 · PRIVACY ─────────────────────────────────────────── -->
+    <section class="section" data-od-id="privacy">
+      <div class="container stack" style="gap: 40px;">
+        <div style="max-width: 48ch;">
+          <p class="eyebrow">// Private by default</p>
+          <h2>Privacy isn't a toggle. It's the architecture.</h2>
+          <p class="lead" style="margin-top: 14px;">Most "private" AI gateways add tracking on top. InterAPI removes it — no account footprint, untraceable payment, and nothing stored to leak or hand over.</p>
+        </div>
+
+        <div class="priv-grid">
+          <div class="priv-cell" data-od-id="priv-noemail">
+            <div class="priv-head">
+              <span class="priv-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 7l5 5-5 5M12 17h8"/></svg></span>
+              <h3>No email to sign up</h3>
+            </div>
+            <p>Generate a key. That key <em>is</em> the account — no email, no phone, no recovery quiz that links back to a real person.</p>
+            <p class="priv-kw" style="margin-top:12px;">→ identity: none</p>
+          </div>
+          <div class="priv-cell" data-od-id="priv-crypto">
+            <div class="priv-head">
+              <span class="priv-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="8"/><path d="M9 8h4a2.5 2.5 0 010 5M9 13h4.5a2.5 2.5 0 010 5M9 8v10M11 6v2M11 18v2"/></svg></span>
+              <h3>Pay in crypto, including Monero</h3>
+            </div>
+            <p>Top up with BTC, ETH, USDT or XMR. Monero means the payment itself can't be traced back to your key.</p>
+            <p class="priv-kw" style="margin-top:12px;">→ payment: unlinkable</p>
+          </div>
+          <div class="priv-cell" data-od-id="priv-nologs">
+            <div class="priv-head">
+              <span class="priv-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 5l14 14M5 19L19 5"/></svg></span>
+              <h3>No logs, no telemetry</h3>
+            </div>
+            <p>Prompts aren't stored, requests aren't logged, analytics aren't collected. There's nothing to subpoena and nothing to breach.</p>
+            <p class="priv-kw" style="margin-top:12px;">→ retention: zero</p>
+          </div>
+          <div class="priv-cell" data-od-id="priv-forward">
+            <div class="priv-head">
+              <span class="priv-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12h12M12 6l6 6-6 6"/></svg></span>
+              <h3>Providers see your prompt, not you</h3>
+            </div>
+            <p>We strip your identity before forwarding. The model maker receives a request — never a profile, an account, or a billing trail.</p>
+            <p class="priv-kw" style="margin-top:12px;">→ upstream: anonymous</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 4 · COMPATIBILITY ──────────────────────────────────── -->
+    <section class="section" data-od-id="compatibility">
+      <div class="container stack" style="gap: 40px;">
+        <div style="max-width: 48ch;">
+          <p class="eyebrow">// Works with your stack</p>
+          <h2>Point your tools at one URL. Done.</h2>
+          <p class="lead" style="margin-top: 14px;">InterAPI speaks the OpenAI and Anthropic wire formats, so the agents and CLIs you already use just work — set a base URL and your key.</p>
+        </div>
+
+        <div class="compat-grid">
+          <div class="compat-cell" data-od-id="compat-claude-code">
+            <div class="compat-name">Claude Code <span class="compat-tag">anthropic api</span></div>
+            <pre><span class="k">ANTHROPIC_BASE_URL</span>=<span class="v">https://api.interapi.dev</span>
+<span class="k">ANTHROPIC_API_KEY</span>=<span class="v">$INTERAPI_KEY</span>
+<span class="k">claude</span></pre>
+          </div>
+          <div class="compat-cell" data-od-id="compat-codex">
+            <div class="compat-name">Codex <span class="compat-tag">openai api</span></div>
+            <pre><span class="k">OPENAI_BASE_URL</span>=<span class="v">https://api.interapi.dev/v1</span>
+<span class="k">OPENAI_API_KEY</span>=<span class="v">$INTERAPI_KEY</span>
+<span class="k">codex</span></pre>
+          </div>
+          <div class="compat-cell" data-od-id="compat-opencode">
+            <div class="compat-name">OpenCode <span class="compat-tag">provider gateway</span></div>
+            <pre>provider: <span class="v">openai-compatible</span>
+base: <span class="v">https://api.interapi.dev/v1</span>
+key:  <span class="v">$INTERAPI_KEY</span></pre>
+          </div>
+          <div class="compat-cell" data-od-id="compat-openclaw">
+            <div class="compat-name">OpenClaw <span class="compat-tag">openai api</span></div>
+            <pre><span class="k">OPENAI_BASE_URL</span>=<span class="v">https://api.interapi.dev/v1</span>
+<span class="k">OPENAI_API_KEY</span>=<span class="v">$INTERAPI_KEY</span></pre>
+          </div>
+          <div class="compat-cell" data-od-id="compat-gemini-cli">
+            <div class="compat-name">Gemini CLI <span class="compat-tag">custom endpoint</span></div>
+            <pre><span class="k">GEMINI_API_BASE</span>=<span class="v">https://api.interapi.dev/v1</span>
+<span class="k">GEMINI_API_KEY</span>=<span class="v">$INTERAPI_KEY</span></pre>
+          </div>
+          <div class="compat-cell" data-od-id="compat-curl">
+            <div class="compat-name">Anything else <span class="compat-tag">raw http</span></div>
+            <pre>curl <span class="v">https://api.interapi.dev/v1</span>/chat/completions \
+  -H <span class="v">"Authorization: Bearer $KEY"</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 5 · BENEFITS ──────────────────────────────────────── -->
+    <section class="section" data-od-id="benefits">
+      <div class="container stack" style="gap: 48px;">
+        <div style="max-width: 40ch;">
+          <p class="eyebrow">// Why InterAPI</p>
+          <h2>Cheaper, honest, and it draws.</h2>
+        </div>
+        <div class="grid-3">
+          <div class="feature" data-od-id="benefit-price">
+            <div class="feature-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v18M16 7H9.5a2.5 2.5 0 000 5h5a2.5 2.5 0 010 5H7"/></svg>
+            </div>
+            <h3>Up to 70% cheaper</h3>
+            <p>Provider rates plus a thin margin, billed per call — no subscription and no per-seat tax. Often dramatically cheaper than going direct once you stop paying for the brand.</p>
+          </div>
+          <div class="feature" data-od-id="benefit-integrity">
+            <div class="feature-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+            <h3>Model integrity</h3>
+            <p>The model you request is the model you get — no silent swaps, no quiet downgrades, no "turbo" bait-and-switch. The returned headers confirm exactly what ran.</p>
+          </div>
+          <div class="feature" data-od-id="benefit-image">
+            <div class="feature-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 16l-5-4-7 7"/></svg>
+            </div>
+            <h3>Image generation</h3>
+            <p>Same key, same endpoint — FLUX, gpt-image, Imagen. Text-to-image and edits without opening a second account or wiring a second gateway.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 6 · PRICING (per use) ─────────────────────────────── -->
+    <section class="section" id="pricing" data-od-id="pricing">
+      <div class="container stack" style="gap: 40px;">
+        <div class="price-head">
+          <p class="eyebrow">// Pricing</p>
+          <p class="price-stmt">Pay per call. No plans, no tiers, no seats.</p>
+          <p class="lead" style="margin: 16px auto 0;">You're not subscribing to software. You're buying tokens of compute, metered in real time, at the model's real rate.</p>
+        </div>
+
+        <div class="price-grid">
+          <div class="price-cell" data-od-id="price-topup">
+            <p class="step">01 · Top up</p>
+            <h3>Fund with crypto or card</h3>
+            <p>Add credit with BTC, ETH, USDT or Monero — or a card if you prefer. Monero keeps the top-up unlinkable from your key.</p>
+          </div>
+          <div class="price-cell" data-od-id="price-meter">
+            <p class="step">02 · Use</p>
+            <h3>Metered per call</h3>
+            <p>Every request is billed at the underlying provider's rate plus a thin margin, debited from your balance in real time as tokens flow.</p>
+          </div>
+          <div class="price-cell" data-od-id="price-no-sub">
+            <p class="step">03 · Never subscribe</p>
+            <h3>Zero recurring charges</h3>
+            <p>No monthly fee, no minimum, no seat licenses. Credit sits until you spend it. Stop any time — there's nothing to cancel.</p>
+          </div>
+        </div>
+
+        <p class="price-note"><strong>Up to 70% cheaper</strong> than direct provider billing on common workloads · live per-model rates are published in <strong>Console</strong>.</p>
+      </div>
+    </section>
+
+    <!-- ─── 7 · CTA ───────────────────────────────────────────── -->
+    <section class="section cta-strip" data-od-id="cta">
+      <div class="container stack" style="align-items: center;">
+        <h2>One key. Every model. Your identity stays yours.</h2>
+        <p class="lead">Generate a key in seconds — no email required. Top up with Monero and send your first request.</p>
+        <div class="hero-cta" style="justify-content: center;">
+          <a class="btn btn-primary" href="#" data-od-id="cta-console">Open Console</a>
+          <a class="btn btn-secondary" href="#" data-od-id="cta-docs">Read the docs</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="pagefoot" data-od-id="footer">
+    <div class="container row-between">
+      <span>© InterAPI · privacy-first AI infrastructure</span>
+      <span class="row" style="gap: var(--gap-lg);">
+        <a href="#pricing">Pricing</a>
+        <a href="#">Docs</a>
+        <a href="#">Blog</a>
+        <a href="#">Status</a>
+        <a href="#">Privacy</a>
+      </span>
+      <span class="meta">no email · no logs · pay in XMR</span>
+    </div>
+  </footer>
+
+<script>
+(function () {
+  var path = document.getElementById('termPath');
+  var body = document.getElementById('termBody');
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.term-tab'));
+  if (!body || !tabs.length) return;
+
+  var SCENARIOS = {
+    claude:   { path: 'interapi — /v1/chat/completions',  model: 'claude-opus-4-1', endpoint: '/v1/chat/completions', kind: 'chat',
+                out: '\u2190 200 OK \u00b7 model: claude-opus-4-1 \u00b7 role: assistant \u00b7 streamed' },
+    gpt:      { path: 'interapi — /v1/chat/completions',  model: 'gpt-4.1', endpoint: '/v1/chat/completions', kind: 'chat',
+                out: '\u2190 200 OK \u00b7 model: gpt-4.1 \u00b7 role: assistant \u00b7 streamed' },
+    gemini:   { path: 'interapi — /v1/chat/completions',  model: 'gemini-2.5-pro', endpoint: '/v1/chat/completions', kind: 'chat',
+                out: '\u2190 200 OK \u00b7 model: gemini-2.5-pro \u00b7 role: assistant \u00b7 streamed' },
+    deepseek: { path: 'interapi — /v1/chat/completions',  model: 'deepseek-v3.2', endpoint: '/v1/chat/completions', kind: 'chat',
+                out: '\u2190 200 OK \u00b7 model: deepseek-v3.2 \u00b7 role: assistant \u00b7 streamed' },
+    image:    { path: 'interapi — /v1/images/generations', model: 'flux-1.1-pro', endpoint: '/v1/images/generations', kind: 'image',
+                out: '\u2190 201 Created \u00b7 model: flux-1.1-pro \u00b7 image/png \u00b7 returned' }
+  };
+
+  var current = 'claude';
+  var typingTimer = null;
+  var rotateTimer = null;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function buildCommand(s) {
+    if (s.kind === 'image') {
+      return [
+        '<span class="t-prompt">$</span> curl https://api.interapi.dev' + s.endpoint + ' \\',
+        '  -H "Authorization: Bearer <span class="t-key">$INTERAPI_KEY</span>" \\',
+        '  -d \'{',
+        '    "model": "<span class="t-model">' + s.model + '</span>",',
+        '    "prompt": "a quiet terminal at 3am, monochrome",',
+        '    "size": "1024x1024"',
+        '  }\'',
+        ''
+      ].join('\n');
+    }
+    return [
+      '<span class="t-prompt">$</span> curl https://api.interapi.dev' + s.endpoint + ' \\',
+      '  -H "Authorization: Bearer <span class="t-key">$INTERAPI_KEY</span>" \\',
+      '  -d \'{',
+      '    "model": "<span class="t-model">' + s.model + '</span>",',
+      '    "messages": [{"role":"user","content":"summarize this repo"}]',
+      '  }\'',
+      ''
+    ].join('\n');
+  }
+
+  function typeOut(text) {
+    var i = 0;
+    if (typingTimer) { clearInterval(typingTimer); typingTimer = null; }
+    function step() {
+      if (i <= text.length) {
+        body.innerHTML = buildCommand(SCENARIOS[current]) + '<span class="t-ok">' + escapeHtml(text.slice(0, i)) + '</span><span class="caret"></span>';
+        i++;
+      } else {
+        body.innerHTML = buildCommand(SCENARIOS[current]) + '<span class="t-ok">' + escapeHtml(text) + '</span><span class="caret"></span>';
+        clearInterval(typingTimer);
+        typingTimer = null;
+      }
+    }
+    if (reduced) { body.innerHTML = buildCommand(SCENARIOS[current]) + '<span class="t-ok">' + escapeHtml(text) + '</span>'; return; }
+    typingTimer = setInterval(step, 18);
+  }
+
+  function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function select(id, fromUser) {
+    current = id;
+    tabs.forEach(function (t) { t.setAttribute('aria-selected', t.dataset.scenario === id ? 'true' : 'false'); });
+    var s = SCENARIOS[id];
+    if (path) path.textContent = s.path;
+    body.innerHTML = buildCommand(s) + '<span class="t-ok"><span class="caret"></span></span>';
+    typeOut(s.out);
+    if (fromUser) { stopRotate(); startRotate(true); }
+  }
+
+  function startRotate(pause) {
+    stopRotate();
+    if (pause) {
+      rotateTimer = setTimeout(function () { advance(); startRotate(false); }, 6000);
+    } else {
+      rotateTimer = setInterval(advance, 4500);
+    }
+  }
+  function stopRotate() { if (rotateTimer) { clearTimeout(rotateTimer); clearInterval(rotateTimer); rotateTimer = null; } }
+  function advance() {
+    var order = ['claude','gpt','gemini','deepseek','image'];
+    var idx = order.indexOf(current);
+    select(order[(idx + 1) % order.length], false);
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { select(t.dataset.scenario, true); });
+  });
+  var termEl = document.querySelector('.term');
+  if (termEl) { termEl.addEventListener('mouseenter', stopRotate); termEl.addEventListener('mouseleave', function () { startRotate(false); }); }
+
+  select('claude', false);
+  startRotate(false);
+})();
+</script>
+</body>
+</html>

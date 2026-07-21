@@ -13,18 +13,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ThemeAssets holds the embedded frontend assets for both themes.
+// ThemeAssets holds the embedded frontend assets for each shipped theme.
 type ThemeAssets struct {
 	DefaultBuildFS   embed.FS
 	DefaultIndexPage []byte
 	ClassicBuildFS   embed.FS
 	ClassicIndexPage []byte
+	InterapiBuildFS  embed.FS
+	InterapiIndexPage []byte
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	defaultFS := common.EmbedFolder(assets.DefaultBuildFS, "web/default/dist")
 	classicFS := common.EmbedFolder(assets.ClassicBuildFS, "web/classic/dist")
-	themeFS := common.NewThemeAwareFS(defaultFS, classicFS)
+	interapiFS := common.EmbedFolder(assets.InterapiBuildFS, "web/interapi/dist")
+	themeFS := common.NewThemeAwareFS(defaultFS, map[string]static.ServeFileSystem{
+		"classic":  classicFS,
+		"interapi": interapiFS,
+	})
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
@@ -37,10 +43,15 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 			return
 		}
 		c.Header("Cache-Control", "no-cache")
-		if common.GetTheme() == "classic" {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.ClassicIndexPage)
-		} else {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.DefaultIndexPage)
+		var indexPage []byte
+		switch common.GetTheme() {
+		case "classic":
+			indexPage = assets.ClassicIndexPage
+		case "interapi":
+			indexPage = assets.InterapiIndexPage
+		default:
+			indexPage = assets.DefaultIndexPage
 		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexPage)
 	})
 }

@@ -55,7 +55,7 @@ import { useUpdateOption } from '../hooks/use-update-option'
 
 const _systemInfoSchema = z.object({
   theme: z.object({
-    frontend: z.enum(['default', 'classic']),
+    frontend: z.enum(['default', 'classic', 'interapi']),
   }),
   SystemName: z.string().min(1),
   ServerAddress: z.string().optional(),
@@ -80,14 +80,19 @@ function normalizeValue(value: unknown): string {
   return typeof value === 'string' ? value : String(value)
 }
 
+function normalizeThemeFrontend(value: unknown): 'default' | 'classic' | 'interapi' {
+  if (value === 'classic') return 'classic'
+  if (value === 'interapi') return 'interapi'
+  return 'default'
+}
+
 export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
 
   const normalizedDefaults: SystemInfoFormValues = {
     theme: {
-      frontend:
-        defaultValues.theme?.frontend === 'classic' ? 'classic' : 'default',
+      frontend: normalizeThemeFrontend(defaultValues.theme?.frontend),
     },
     SystemName: normalizeValue(defaultValues.SystemName),
     ServerAddress: normalizeValue(defaultValues.ServerAddress),
@@ -103,7 +108,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
 
   const systemInfoSchemaWithI18n = z.object({
     theme: z.object({
-      frontend: z.enum(['default', 'classic']),
+      frontend: z.enum(['default', 'classic', 'interapi']),
     }),
     SystemName: z.string().min(1, {
       error: () => t('System name is required'),
@@ -205,6 +210,10 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                           value: 'classic',
                           label: t('Classic (Legacy Frontend)'),
                         },
+                        {
+                          value: 'interapi',
+                          label: t('InterAPI (Privacy Skin)'),
+                        },
                       ]}
                       onValueChange={field.onChange}
                       value={field.value}
@@ -222,12 +231,15 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                           <SelectItem value='classic'>
                             {t('Classic (Legacy Frontend)')}
                           </SelectItem>
+                          <SelectItem value='interapi'>
+                            {t('InterAPI (Privacy Skin)')}
+                          </SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FormDescription>
                       {t(
-                        'Switch between the new frontend and the classic frontend. Changes take effect after page reload.'
+                        'Switch between the new frontend, the classic frontend, or the InterAPI privacy skin. Changes take effect after page reload.'
                       )}
                     </FormDescription>
                     <FormMessage />
