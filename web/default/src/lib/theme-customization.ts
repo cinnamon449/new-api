@@ -38,6 +38,16 @@ export const THEME_PRESETS = [
     swatches: ['oklch(0.984 0.005 95)', 'oklch(0.685 0.142 38)'],
   },
   {
+    // InterAPI brand preset: warm cream canvas (#fdfcfc) on near-black ink
+    // (#201d1d), mirroring the terminal/manpage storefront aesthetic. Brands
+    // the console; the storefront itself forces JetBrains Mono via scoped CSS
+    // (see `features/home/storefront.css`), so this preset stays on the
+    // humanist sans for dashboard readability.
+    value: 'interapi',
+    name: 'InterAPI',
+    swatches: ['oklch(0.984 0.003 90)', 'oklch(0.205 0.005 60)'],
+  },
+  {
     value: 'simple-large',
     name: 'Simple Large-font',
     swatches: ['oklch(0.15 0 0)', 'oklch(0.99 0 0)'],

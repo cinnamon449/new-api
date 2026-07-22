@@ -20,14 +20,14 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
-import { Footer } from '@/components/layout/components/footer'
 import { RichContent } from '@/components/rich-content'
 import { useTheme } from '@/context/theme-provider'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { CTA, Features, Hero, HowItWorks, Stats } from './components'
+import { CTA, Faq, Features, Hero, HowItWorks, Stats, StorefrontFooter } from './components'
 import { useHomePageContent } from './hooks'
+import './storefront.css'
 
 export function Home() {
   const { i18n, t } = useTranslation()
@@ -122,12 +122,15 @@ export function Home() {
 
   return (
     <PublicLayout showMainContainer={false}>
-      <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
-      <HowItWorks />
-      <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
+      <div className='storefront'>
+        <Hero isAuthenticated={isAuthenticated} />
+        <Stats />
+        <Features />
+        <HowItWorks />
+        <Faq />
+        <CTA isAuthenticated={isAuthenticated} />
+        <StorefrontFooter />
+      </div>
     </PublicLayout>
   )
 }

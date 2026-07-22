@@ -16,73 +16,118 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Settings, Zap, BarChart3 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { AnimateInView } from '@/components/animate-in-view'
+// "Works with your tools" — a DESIGN.md `button-tab` strip + `install-snippet`
+// showing how to point each tool at InterAPI. Tool names are proper nouns
+// (untranslated); only chrome strings go through t().
+const TOOLS = [
+  {
+    id: 'claude-code',
+    label: 'Claude Code',
+    snippet: `export ANTHROPIC_BASE_URL=https://api.interapi.ai
+export ANTHROPIC_AUTH_TOKEN=sk-your-key`,
+  },
+  {
+    id: 'codex',
+    label: 'Codex',
+    snippet: `export OPENAI_BASE_URL=https://api.interapi.ai/v1
+export OPENAI_API_KEY=sk-your-key`,
+  },
+  {
+    id: 'opencode',
+    label: 'OpenCode',
+    snippet: `export OPENAI_BASE_URL=https://api.interapi.ai/v1
+export OPENAI_API_KEY=sk-your-key`,
+  },
+  {
+    id: 'openclaw',
+    label: 'OpenClaw',
+    snippet: `export OPENAI_BASE_URL=https://api.interapi.ai/v1
+export OPENAI_API_KEY=sk-your-key`,
+  },
+  {
+    id: 'gemini-cli',
+    label: 'Gemini CLI',
+    snippet: `export GEMINI_API_BASE=https://api.interapi.ai/v1beta
+export GEMINI_API_KEY=sk-your-key`,
+  },
+]
 
 export function HowItWorks() {
   const { t } = useTranslation()
+  const [activeId, setActiveId] = useState(TOOLS[0].id)
+  const [copied, setCopied] = useState(false)
 
-  const steps = [
-    {
-      num: '1',
-      title: t('Configure'),
-      desc: t(
-        'Add your API keys, set up channels and configure access permissions'
-      ),
-      icon: <Settings className='size-6' strokeWidth={1.5} />,
-    },
-    {
-      num: '2',
-      title: t('Connect'),
-      desc: t(
-        'Connect through OpenAI, Claude, Gemini, and other compatible API routes'
-      ),
-      icon: <Zap className='size-6' strokeWidth={1.5} />,
-    },
-    {
-      num: '3',
-      title: t('Monitor'),
-      desc: t('Track usage, costs and performance with real-time analytics'),
-      icon: <BarChart3 className='size-6' strokeWidth={1.5} />,
-    },
-  ]
+  const active = TOOLS.find((tool) => tool.id === activeId) ?? TOOLS[0]
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(active.snippet)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      // Clipboard may be unavailable (e.g. non-secure context); ignore.
+    }
+  }
 
   return (
-    <section className='border-border/40 relative z-10 border-t px-6 py-24 md:py-32'>
-      <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-16 text-center md:mb-20'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
-            {t('How It Works')}
-          </p>
-          <h2 className='text-2xl font-bold tracking-tight md:text-3xl'>
-            {t('Three steps to get started')}
-          </h2>
-        </AnimateInView>
+    <section className='st-section st-rule-top'>
+      <div className='st-container'>
+        <h2 className='st-label'>{t('Works with your tools')}</h2>
+        <p
+          className='mt-3 max-w-2xl'
+          style={{ color: 'var(--st-body)', lineHeight: 1.6 }}
+        >
+          {t(
+            'Point your existing tools at InterAPI — one key, every model. No new app to install.'
+          )}
+        </p>
 
-        <div className='grid gap-8 md:grid-cols-3 md:gap-12'>
-          {steps.map((step, i) => (
-            <AnimateInView
-              key={step.num}
-              delay={i * 150}
-              animation='fade-up'
-              className='relative flex flex-col items-center text-center'
-            >
-              <div className='relative mb-6'>
-                <div className='text-muted-foreground border-border/50 bg-muted/30 flex size-16 items-center justify-center rounded-2xl border transition-colors'>
-                  {step.icon}
-                </div>
-                <div className='bg-foreground text-background absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full text-xs font-bold'>
-                  {step.num}
-                </div>
-              </div>
-              <h3 className='mb-2 text-base font-semibold'>{step.title}</h3>
-              <p className='text-muted-foreground max-w-[240px] text-sm leading-relaxed'>
-                {step.desc}
-              </p>
-            </AnimateInView>
-          ))}
+        {/* Tab strip */}
+        <div
+          className='mt-8 flex flex-wrap gap-2'
+          style={{ borderBottom: '1px solid var(--st-hairline-strong)' }}
+        >
+          {TOOLS.map((tool) => {
+            const isActive = tool.id === activeId
+            return (
+              <button
+                key={tool.id}
+                type='button'
+                onClick={() => setActiveId(tool.id)}
+                style={{
+                  background: 'transparent',
+                  color: isActive ? 'var(--st-ink)' : 'var(--st-mute)',
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderBottom: isActive
+                    ? '2px solid var(--st-ash)'
+                    : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  fontWeight: 500,
+                  lineHeight: 2,
+                }}
+              >
+                {tool.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Install snippet */}
+        <div className='mt-6 flex items-stretch gap-2'>
+          <pre
+            className='st-snippet flex-1'
+            style={{ margin: 0 }}
+          >
+            {active.snippet}
+          </pre>
+          <button type='button' onClick={copy} className='st-btn st-btn-secondary'>
+            {copied ? t('Copied') : t('Copy')}
+          </button>
         </div>
       </div>
     </section>

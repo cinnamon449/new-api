@@ -26,6 +26,10 @@ For commercial licensing, please contact support@quantumnous.com
  * that activates it. Loaded globally so font-switching is instantaneous
  * with no FOUT once the variable is fetched. */
 @import '@fontsource-variable/lora';
+/* Berkeley Mono substitute for the InterAPI storefront — the storefront forces
+ * this family locally via the `.storefront` wrapper (see
+ * `features/home/storefront.css`); it is never applied to the console. */
+@import '@fontsource-variable/jetbrains-mono';
 
 @import './theme.css';
 @import './theme-presets.css';

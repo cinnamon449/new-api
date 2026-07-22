@@ -1,0 +1,234 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/*
+ * InterAPI storefront — terminal/manpage aesthetic (DESIGN.md).
+ *
+ * Scoped to a `.storefront` wrapper on the public landing so the monospace +
+ * warm-cream look never leaks into the console. JetBrains Mono is forced
+ * locally here; the global `--font-body` token is intentionally left untouched
+ * (the dashboard keeps its humanist sans for readability). Everything is flat:
+ * no shadows, no gradients; depth comes from typography and the single dark
+ * hero TUI mockup.
+ */
+
+.storefront {
+  /* DESIGN.md palette (light) */
+  --st-canvas: #fdfcfc;
+  --st-ink: #201d1d;
+  --st-ink-deep: #0f0000;
+  --st-surface-soft: #f8f7f7;
+  --st-surface-card: #f1eeee;
+  --st-surface-dark: #201d1d;
+  --st-surface-dark-elevated: #302c2c;
+  --st-hairline: rgba(15, 0, 0, 0.12);
+  --st-hairline-strong: #646262;
+  --st-body: #424245;
+  --st-mute: #646262;
+  --st-stone: #6e6e73;
+  --st-ash: #9a9898;
+  --st-on-dark: #fdfcfc;
+  --st-on-dark-mute: #9a9898;
+  --st-accent: #007aff; /* reserved for in-TUI syntax highlights only */
+  --st-success: #30d158;
+  --st-warning: #ff9f0a;
+  --st-danger: #ff3b30;
+
+  background: var(--st-canvas);
+  color: var(--st-ink);
+  font-family:
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-feature-settings: 'liga' 0, 'calt' 1, 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Break inheritance from the global Public Sans / Lora body font so every
+ * storefront text role renders in JetBrains Mono. */
+.storefront
+  :where(h1, h2, h3, h4, h5, p, span, a, strong, b, em, code, kbd, pre, samp,
+    button, input, textarea, select, li, small, label, blockquote) {
+  font-family: inherit;
+}
+
+.storefront a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--st-hairline-strong);
+  transition: text-decoration-color 120ms ease;
+}
+.storefront a:hover {
+  text-decoration-color: var(--st-ink);
+}
+
+/* ── Section rhythm ── 96px desktop → 64px tablet → 48px mobile ── */
+.storefront .st-section {
+  padding-block: 96px;
+}
+.storefront .st-container {
+  margin-inline: auto;
+  max-width: 960px;
+  padding-inline: 24px;
+}
+@media (max-width: 1024px) {
+  .storefront .st-section {
+    padding-block: 64px;
+  }
+}
+@media (max-width: 640px) {
+  .storefront .st-section {
+    padding-block: 48px;
+  }
+  .storefront .st-container {
+    padding-inline: 16px;
+  }
+}
+
+/* ── Interactive primitives: 4px-radius rectangles, no shadow ── */
+.storefront .st-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 2;
+  padding: 4px 20px;
+  min-height: 36px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.storefront .st-btn-primary {
+  background: var(--st-ink);
+  color: var(--st-canvas);
+}
+.storefront .st-btn-primary:active {
+  background: var(--st-ink-deep);
+}
+.storefront .st-btn-secondary {
+  background: var(--st-canvas);
+  color: var(--st-ink);
+  border-color: var(--st-hairline-strong);
+}
+.storefront .st-btn-secondary:active {
+  background: var(--st-surface-soft);
+}
+
+/* Hairline rules + bordered text blocks (the only "elevation"). */
+.storefront .st-rule-top {
+  border-top: 1px solid var(--st-hairline);
+}
+.storefront .st-rule-bottom {
+  border-bottom: 1px solid var(--st-hairline);
+}
+.storefront .st-block {
+  border: 1px solid var(--st-hairline);
+}
+
+/* Section label — heading-md (16px/700) above a hairline rule. */
+.storefront .st-label {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--st-ink);
+}
+
+/* install-snippet pill. */
+.storefront .st-snippet {
+  background: var(--st-surface-card);
+  color: var(--st-ink);
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+/* Keyboard hints — a hairline-bordered mono key, no shadow. */
+.storefront kbd {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 0.85em;
+  line-height: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--st-hairline-strong);
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+}
+
+/* FAQ rows — native <details> disclosure so it works without JS. The +/−
+ * marker is the brand's only toggle affordance (no chevron icons). */
+.storefront details > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 0;
+  color: var(--st-ink);
+  border-bottom: 1px solid var(--st-hairline);
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+.storefront details > summary::-webkit-details-marker {
+  display: none;
+}
+.storefront details > summary .st-toggle::before {
+  content: '+';
+  color: var(--st-mute);
+  font-weight: 700;
+}
+.storefront details[open] > summary .st-toggle::before {
+  content: '−';
+}
+.storefront details > summary .st-q {
+  font-weight: 700;
+  color: var(--st-ink);
+  line-height: 1.5;
+}
+.storefront details .st-a {
+  padding: 12px 0 16px 20px;
+  color: var(--st-body);
+  line-height: 1.6;
+}
+
+/* Dark variant — invert canvas/ink. The hero TUI block stays dark in both. */
+.dark .storefront {
+  --st-canvas: #161313;
+  --st-ink: #fdfcfc;
+  --st-ink-deep: #000000;
+  --st-surface-soft: #1c1818;
+  --st-surface-card: #221e1e;
+  --st-surface-dark: #0f0d0d;
+  --st-surface-dark-elevated: #2a2626;
+  --st-hairline: rgba(253, 252, 252, 0.14);
+  --st-hairline-strong: #9a9898;
+  --st-body: #c9c6c4;
+  --st-mute: #9a9898;
+  --st-stone: #8a8888;
+  --st-ash: #6e6c6c;
+  --st-on-dark: #fdfcfc;
+  --st-on-dark-mute: #6e6c6c;
+}
