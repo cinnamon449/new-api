@@ -96,6 +96,10 @@ func RequestPlisioPay(c *gin.Context) {
 	}
 
 	user, _ := model.GetUserById(id, false)
+	email := strings.TrimSpace(user.Email)
+	if email == "" {
+		email = user.Username + "@interapi.local"
+	}
 	tradeNo := fmt.Sprintf("PLSUSR%dNO%s%d", id, common.GetRandomString(6), time.Now().Unix())
 
 	// Resolve amount stored on the order in display units (mirror Epay logic).
@@ -129,7 +133,7 @@ func RequestPlisioPay(c *gin.Context) {
 	if sourceCurrency == "" {
 		sourceCurrency = "USD"
 	}
-	invoiceURL, err := createPlisioInvoice(c.Request.Context(), tradeNo, fmt.Sprintf("Top-up #%d", req.Amount), strconv.FormatFloat(payMoney, 'f', 2, 64), sourceCurrency, user.Email)
+	invoiceURL, err := createPlisioInvoice(c.Request.Context(), tradeNo, fmt.Sprintf("Top-up #%d", req.Amount), strconv.FormatFloat(payMoney, 'f', 2, 64), sourceCurrency, email)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Plisio 创建发票失败 user_id=%d trade_no=%s amount=%d error=%q", id, tradeNo, req.Amount, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
