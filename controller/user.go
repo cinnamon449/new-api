@@ -882,6 +882,19 @@ func UpdateSelf(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	currentUser, err := model.GetUserById(cleanUser.Id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if _, provided := requestData["username"]; !provided {
+		cleanUser.Username = currentUser.Username
+	}
+	if _, provided := requestData["display_name"]; !provided {
+		cleanUser.DisplayName = currentUser.DisplayName
+	}
+	cleanUser.Group = currentUser.Group
+	cleanUser.Remark = currentUser.Remark
 	if updatePassword {
 		identity, ok := middleware.GetSessionAuthIdentity(c)
 		if !ok {
@@ -998,6 +1011,28 @@ func DeleteSelf(c *gin.Context) {
 		"message": "",
 	})
 	return
+}
+
+func RemoveSelfEmail(c *gin.Context) {
+	id := c.GetInt("id")
+	user, err := model.GetUserById(id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	if user.Email != "" {
+		if err := user.ClearBinding("email"); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		model.RecordLog(id, model.LogTypeSystem, "移除邮箱绑定")
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
 }
 
 func CreateUser(c *gin.Context) {
