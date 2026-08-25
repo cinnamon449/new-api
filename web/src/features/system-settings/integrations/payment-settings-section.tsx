@@ -711,7 +711,10 @@ export function PaymentSettingsSection({
       updates.push({ key: 'WaffoPayMethods', value: sanitized.WaffoPayMethods })
     }
 
-    if (sanitized.PlisioApiKey && sanitized.PlisioApiKey !== initial.PlisioApiKey) {
+    if (
+      sanitized.PlisioApiKey &&
+      sanitized.PlisioApiKey !== initial.PlisioApiKey
+    ) {
       updates.push({ key: 'PlisioApiKey', value: sanitized.PlisioApiKey })
     }
 
@@ -1633,9 +1636,7 @@ export function PaymentSettingsSection({
             <TabsContent value='plisio' className={paymentTabContentClassName}>
               <div className='space-y-4'>
                 <div>
-                  <h3 className='text-lg font-medium'>
-                    {t('Plisio Gateway')}
-                  </h3>
+                  <h3 className='text-lg font-medium'>{t('Plisio Gateway')}</h3>
                   <p className='text-muted-foreground text-sm'>
                     {t('Configuration for Plisio cryptocurrency payments')}
                   </p>
@@ -1679,9 +1680,7 @@ export function PaymentSettingsSection({
                           />
                         </FormControl>
                         <FormDescription>
-                          {t(
-                            'Plisio secret key (leave blank unless updating)'
-                          )}
+                          {t('Plisio secret key (leave blank unless updating)')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
