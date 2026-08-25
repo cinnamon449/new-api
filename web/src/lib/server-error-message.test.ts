@@ -65,4 +65,13 @@ describe('server error message mapping', () => {
       })
     ).toBe(expected.TELEGRAM_BIND_INTERNAL_ERROR)
   })
+
+  test('maps an invalid 2FA code without exposing the server language', () => {
+    expect(
+      getServerErrorMessageKey({
+        code: 'TWOFA_CODE_INVALID',
+        message: '验证码或备用码不正确',
+      })
+    ).toBe('Verification code or backup code is incorrect')
+  })
 })

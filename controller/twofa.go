@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -26,6 +27,14 @@ type Verify2FARequest struct {
 
 type twoFALoginFlowPayload struct {
 	AuthVersion int64 `json:"auth_version"`
+}
+
+func writeTwoFACodeInvalid(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success": false,
+		"code":    "TWOFA_CODE_INVALID",
+		"message": i18n.T(c, i18n.MsgTwoFACodeInvalid),
+	})
 }
 
 // Setup2FAResponse 设置2FA响应结构
@@ -175,10 +184,7 @@ func Enable2FA(c *gin.Context) {
 	}
 
 	if !common.ValidateTOTPCode(twoFA.Secret, cleanCode) {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "验证码或备用码错误，请重试",
-		})
+		writeTwoFACodeInvalid(c)
 		return
 	}
 
@@ -249,19 +255,17 @@ func Disable2FA(c *gin.Context) {
 		// 尝试验证备用码
 		isValidBackup, err = twoFA.ValidateBackupCodeAndUpdateUsage(req.Code)
 		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
+			if errors.Is(err, model.ErrTwoFACodeInvalid) {
+				writeTwoFACodeInvalid(c)
+			} else {
+				common.ApiError(c, err)
+			}
 			return
 		}
 	}
 
 	if !isValidTOTP && !isValidBackup {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "验证码或备用码错误，请重试",
-		})
+		writeTwoFACodeInvalid(c)
 		return
 	}
 
@@ -373,10 +377,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 		return
 	}
 	if !valid {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "验证码或备用码错误，请重试",
-		})
+		writeTwoFACodeInvalid(c)
 		return
 	}
 
@@ -495,19 +496,17 @@ func Verify2FALogin(c *gin.Context) {
 		// 尝试验证备用码
 		isValidBackup, err = twoFA.ValidateBackupCodeAndUpdateUsage(req.Code)
 		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
+			if errors.Is(err, model.ErrTwoFACodeInvalid) {
+				writeTwoFACodeInvalid(c)
+			} else {
+				common.ApiError(c, err)
+			}
 			return
 		}
 	}
 
 	if !isValidTOTP && !isValidBackup {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "验证码或备用码错误，请重试",
-		})
+		writeTwoFACodeInvalid(c)
 		return
 	}
 
