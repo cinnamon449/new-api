@@ -44,7 +44,7 @@ if [[ "${PUSH}" -eq 1 ]]; then
   docker push "${IMAGE}:latest"
   docker push "${IMAGE}:${GIT_SHA}"
   echo "==> Done. On the server run:"
-  echo "    docker compose pull && docker compose down && docker compose up -d"
+  echo "    cd /opt/interapi && sudo docker compose up -d --pull always --no-deps new-api"
 else
   echo "==> Built locally (--no-push); tags were not pushed."
 fi
