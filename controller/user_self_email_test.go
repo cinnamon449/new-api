@@ -5,46 +5,57 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRemoveSelfEmailClearsOnlyCurrentUserAndIsIdempotent(t *testing.T) {
-	db := setupManageUserTestDB(t)
-	currentUser := model.User{
-		Username: "self-email-user", Password: "password", Email: "self@example.com",
-		Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AffCode: "self-email-aff",
+func TestRemoveSelfEmailRequiresSingleUseBoundProof(t *testing.T) {
+	for _, scenario := range []string{"missing", "wrong scope", "expired", "consumed", "changed email", "success"} {
+		t.Run(scenario, func(t *testing.T) {
+			user, identity := setupSecurityEnrollmentTest(t)
+			require.NoError(t, model.DB.Model(user).Update("email", "self@example.com").Error)
+			operation := service.VerificationOperation{Scope: "account.email.remove", Context: []byte(`{"email":"self@example.com"}`)}
+			proof := ""
+			if scenario != "missing" {
+				if scenario == "wrong scope" {
+					operation = service.VerificationOperation{Scope: service.VerificationScopeAccountDelete}
+				}
+				proof = issueSecurityEnrollmentProof(t, identity, operation, service.VerificationMethodPassword)
+			}
+			switch scenario {
+			case "expired":
+				require.NoError(t, model.DB.Model(&model.AuthFlow{}).Where("purpose = ?", model.AuthFlowPurposeSecurityProof).Update("expires_at", time.Now().Add(-time.Minute)).Error)
+			case "consumed":
+				_, err := service.ConsumeOperationProof(proof, identity, operation)
+				require.NoError(t, err)
+			case "changed email":
+				require.NoError(t, model.DB.Model(user).Update("email", "changed@example.com").Error)
+			}
+			response := securityEnrollmentRequest(http.MethodDelete, "/api/user/self/email", "", proof, identity, RemoveSelfEmail)
+			stored, err := model.GetUserById(user.Id, false)
+			require.NoError(t, err)
+			if scenario != "success" {
+				assert.Equal(t, http.StatusForbidden, response.Code)
+				assert.NotEmpty(t, stored.Email)
+				return
+			}
+			assert.Equal(t, http.StatusOK, response.Code)
+			assert.Empty(t, stored.Email)
+			// A new email must never be removed by replaying the old proof.
+			require.NoError(t, model.DB.Model(user).Update("email", "self@example.com").Error)
+			replay := securityEnrollmentRequest(http.MethodDelete, "/api/user/self/email", "", proof, identity, RemoveSelfEmail)
+			assert.Equal(t, http.StatusForbidden, replay.Code)
+			stored, err = model.GetUserById(user.Id, false)
+			require.NoError(t, err)
+			assert.Equal(t, "self@example.com", stored.Email)
+		})
 	}
-	otherUser := model.User{
-		Username: "other-email-user", Password: "password", Email: "other@example.com",
-		Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AffCode: "other-email-aff",
-	}
-	require.NoError(t, db.Create(&currentUser).Error)
-	require.NoError(t, db.Create(&otherUser).Error)
-
-	for range 2 {
-		recorder := httptest.NewRecorder()
-		context, _ := gin.CreateTestContext(recorder)
-		context.Request = httptest.NewRequest(http.MethodDelete, "/api/user/self/email", nil)
-		context.Set("id", currentUser.Id)
-
-		RemoveSelfEmail(context)
-
-		assert.Equal(t, http.StatusOK, recorder.Code)
-		assert.Contains(t, recorder.Body.String(), `"success":true`)
-	}
-
-	var updatedCurrent model.User
-	require.NoError(t, db.First(&updatedCurrent, currentUser.Id).Error)
-	assert.Empty(t, updatedCurrent.Email)
-
-	var unchangedOther model.User
-	require.NoError(t, db.First(&unchangedOther, otherUser.Id).Error)
-	assert.Equal(t, "other@example.com", unchangedOther.Email)
 }
 
 func TestUpdateSelfPreservesFieldsThatCustomersCannotEdit(t *testing.T) {

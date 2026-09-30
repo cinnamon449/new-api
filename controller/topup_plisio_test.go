@@ -1,11 +1,27 @@
 package controller
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/gin-gonic/gin"
+
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,4 +97,154 @@ func TestPlisioCanonicalBody_PreservesValueBytes(t *testing.T) {
 	got, err := plisioCanonicalBody([]byte(input))
 	require.NoError(t, err)
 	assert.Equal(t, input, got)
+}
+
+// Use the shared dialect fixture so these settlement invariants also run on
+// real MySQL and PostgreSQL, including a separate log database.
+func TestPlisioWebhookSettlement(t *testing.T) {
+	for _, tc := range []struct {
+		name, provider, status, amount string
+		quota                          int
+		storedAmount                   int64
+		money                          float64
+		missingUser, invalidSignature  bool
+		wantStatus                     int
+		wantCredit                     bool
+	}{
+		{name: "completed and duplicate", provider: "plisio", status: "completed", amount: `"5.00"`, storedAmount: 5, wantStatus: 200, wantCredit: true},
+		{name: "invoice cent rounding", provider: "plisio", status: "completed", amount: `"5.00"`, storedAmount: 5, money: 5.005, wantStatus: 200, wantCredit: true},
+		{name: "numeric amount", provider: "plisio", status: "completed", amount: `5`, storedAmount: 5, wantStatus: 200, wantCredit: true},
+		{name: "amount mismatch", provider: "plisio", status: "completed", amount: `"4.00"`, storedAmount: 5, wantStatus: 400},
+		{name: "missing amount", provider: "plisio", status: "completed", amount: `null`, storedAmount: 5, wantStatus: 400},
+		{name: "wrong provider", provider: "epay", status: "completed", amount: `"5.00"`, storedAmount: 5, wantStatus: 400},
+		{name: "pending invoice", provider: "plisio", status: "pending", amount: `"5.00"`, storedAmount: 5, wantStatus: 200},
+		{name: "invalid signature", provider: "plisio", status: "completed", amount: `"5.00"`, storedAmount: 5, invalidSignature: true, wantStatus: 401},
+		{name: "wallet limit rolls back completion", provider: "plisio", status: "completed", amount: `"5.00"`, storedAmount: 5, quota: common.MaxWalletQuota, wantStatus: 500},
+		{name: "overflow rolls back completion", provider: "plisio", status: "completed", amount: `"5.00"`, storedAmount: math.MaxInt64, wantStatus: 500},
+		{name: "missing user rolls back completion", provider: "plisio", status: "completed", amount: `"5.00"`, storedAmount: 5, missingUser: true, wantStatus: 500},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupManageUserTestDB(t)
+			require.NoError(t, db.AutoMigrate(&model.TopUp{}))
+			oldKey := setting.PlisioApiKey
+			setting.PlisioApiKey = "qa-local-plisio-secret"
+			payment := operation_setting.GetPaymentSetting()
+			oldPayment := *payment
+			payment.ComplianceConfirmed = true
+			payment.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+			t.Cleanup(func() { setting.PlisioApiKey = oldKey; *payment = oldPayment })
+			user := model.User{Username: "qa-plisio", Password: "inert-fixture", AffCode: "qa-plisio", Quota: tc.quota}
+			require.NoError(t, db.Create(&user).Error)
+			order := model.TopUp{UserId: user.Id, TradeNo: "qa-plisio-order", Amount: tc.storedAmount, Money: 5, PaymentMethod: "plisio", PaymentProvider: tc.provider, Status: common.TopUpStatusPending}
+			if tc.money != 0 {
+				order.Money = tc.money
+			}
+			require.NoError(t, db.Create(&order).Error)
+			if tc.missingUser {
+				require.NoError(t, db.Unscoped().Delete(&user).Error)
+			}
+			canonical := fmt.Sprintf(`{"txn_id":"qa-txn","order_number":"qa-plisio-order","status":%q,"source_amount":%s}`, tc.status, tc.amount)
+			sig := signPlisioBody(t, canonical, setting.PlisioApiKey)
+			if tc.invalidSignature {
+				sig = "invalid"
+			}
+			body := canonical[:len(canonical)-1] + `,"verify_hash":"` + sig + `"}`
+			request := func() int {
+				recorder := httptest.NewRecorder()
+				ctx, _ := gin.CreateTestContext(recorder)
+				ctx.Request = httptest.NewRequest(http.MethodPost, "/api/plisio/webhook", strings.NewReader(body))
+				PlisioWebhook(ctx)
+				return recorder.Code
+			}
+			if tc.name == "completed and duplicate" {
+				sqlDB, err := db.DB()
+				require.NoError(t, err)
+				if db.Dialector.Name() != "sqlite" {
+					sqlDB.SetMaxOpenConns(4)
+				}
+				start := make(chan struct{})
+				failures := make(chan error, 2)
+				var workers sync.WaitGroup
+				for range 2 {
+					workers.Add(1)
+					go func() {
+						defer workers.Done()
+						<-start
+						_, err := model.RechargePlisio(order.TradeNo, decimal.NewFromInt(5), "127.0.0.1")
+						failures <- err
+					}()
+				}
+				close(start)
+				workers.Wait()
+				close(failures)
+				for err := range failures {
+					if db.Dialector.Name() == "sqlite" && err != nil {
+						// SQLite may reject a competing writer; the subsequent callback
+						// retries after rollback and must still credit exactly once.
+						require.ErrorContains(t, err, "SQLITE_BUSY")
+					} else {
+						require.NoError(t, err)
+					}
+				}
+			}
+			require.Equal(t, tc.wantStatus, request())
+			require.NoError(t, db.First(&order, order.Id).Error)
+			if tc.wantCredit {
+				require.Equal(t, common.TopUpStatusSuccess, order.Status)
+				require.Equal(t, 200, request())
+				require.NoError(t, db.First(&user, user.Id).Error)
+				require.Equal(t, tc.quota+int(5*common.QuotaPerUnit), user.Quota)
+				var count int64
+				require.NoError(t, model.LOG_DB.Model(&model.Log{}).Where("user_id = ?", user.Id).Count(&count).Error)
+				require.EqualValues(t, 1, count)
+			} else {
+				require.Equal(t, common.TopUpStatusPending, order.Status)
+				require.Zero(t, order.CompleteTime)
+				if !tc.missingUser {
+					require.NoError(t, db.First(&user, user.Id).Error)
+					require.Equal(t, tc.quota, user.Quota)
+				}
+			}
+		})
+	}
+}
+
+type plisioInvoiceTestTransport struct {
+	body string
+	err  error
+}
+
+func (transport plisioInvoiceTestTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if transport.err != nil {
+		return nil, transport.err
+	}
+	return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(transport.body)), Request: request}, nil
+}
+func TestPlisioInvoiceErrorsDoNotExposeCredentials(t *testing.T) {
+	oldKey, oldClient := setting.PlisioApiKey, plisioHTTPClient
+	setting.PlisioApiKey = "qa-credential-that-must-not-be-logged"
+	t.Cleanup(func() { setting.PlisioApiKey = oldKey; plisioHTTPClient = oldClient })
+	for _, transport := range []plisioInvoiceTestTransport{{err: errors.New("unavailable")}, {body: `{"status":"error","data":{"message":"qa-credential-that-must-not-be-logged"}}`}} {
+		plisioHTTPClient = &http.Client{Transport: transport}
+		_, err := createPlisioInvoice(context.Background(), "qa-order", "qa-invoice", "5.00", "USD", "")
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), setting.PlisioApiKey)
+		assert.NotContains(t, err.Error(), "api_key")
+	}
+}
+func TestPlisioCheckoutRejectsUnsafeQuotaBeforeInvoice(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{Username: "qa-plisio-limit", AffCode: "qa-plisio-limit", Quota: common.MaxWalletQuota}
+	require.NoError(t, db.Create(&user).Error)
+	for _, handler := range []gin.HandlerFunc{RequestPlisioAmount, RequestPlisioPay} {
+		for _, amount := range []int64{getPlisioMinTopup(), math.MaxInt64} {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/api/user/plisio/pay", strings.NewReader(fmt.Sprintf(`{"amount":%d,"payment_method":"plisio"}`, amount)))
+			ctx.Request.Header.Set("Content-Type", "application/json")
+			ctx.Set("id", user.Id)
+			handler(ctx)
+			assert.Contains(t, recorder.Body.String(), `"message":"error"`)
+		}
+	}
 }

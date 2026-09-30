@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -53,6 +54,9 @@ func RequestPlisioAmount(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
+	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+		return
+	}
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "获取用户分组失败"})
@@ -84,6 +88,9 @@ func RequestPlisioPay(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
+	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+		return
+	}
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "获取用户分组失败"})
@@ -95,7 +102,11 @@ func RequestPlisioPay(c *gin.Context) {
 		return
 	}
 
-	user, _ := model.GetUserById(id, false)
+	user, err := model.GetUserById(id, false)
+	if err != nil || user == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "获取用户失败"})
+		return
+	}
 	email := strings.TrimSpace(user.Email)
 	if email == "" {
 		email = user.Username + "@interapi.local"
@@ -193,7 +204,7 @@ func createPlisioInvoice(ctx context.Context, orderNumber string, orderName stri
 
 	resp, err := plisioHTTPClient.Do(httpReq)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Plisio request failed")
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
@@ -206,7 +217,7 @@ func createPlisioInvoice(ctx context.Context, orderNumber string, orderName stri
 		return "", fmt.Errorf("解析 Plisio 响应失败: %w", err)
 	}
 	if result.Status != "success" || result.Data.InvoiceURL == "" {
-		return "", fmt.Errorf("Plisio 返回非成功状态: status=%s body=%s", result.Status, string(body))
+		return "", fmt.Errorf("Plisio returned an unsuccessful invoice response")
 	}
 	return result.Data.InvoiceURL, nil
 }
@@ -232,7 +243,7 @@ func PlisioWebhook(c *gin.Context) {
 
 	var payload plisioIPN
 	if err := common.Unmarshal(rawBody, &payload); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("Plisio webhook 解析 JSON 失败 path=%q client_ip=%s error=%q body=%q", c.Request.RequestURI, c.ClientIP(), err.Error(), string(rawBody)))
+		logger.LogWarn(ctx, fmt.Sprintf("Plisio webhook 解析 JSON 失败 path=%q client_ip=%s error=%q", c.Request.URL.Path, c.ClientIP(), err.Error()))
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -261,53 +272,34 @@ func PlisioWebhook(c *gin.Context) {
 	LockOrder(payload.OrderNumber)
 	defer UnlockOrder(payload.OrderNumber)
 
-	topUp := model.GetTopUpByTradeNo(payload.OrderNumber)
-	if topUp == nil {
-		logger.LogWarn(ctx, fmt.Sprintf("Plisio webhook completed 但本地订单不存在 trade_no=%s client_ip=%s", payload.OrderNumber, callerIP))
-		c.Status(http.StatusOK)
+	sourceAmount, err := decimal.NewFromString(common.JsonRawMessageToString(payload.SourceAmount))
+	if err != nil || !sourceAmount.IsPositive() {
+		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	if topUp.PaymentProvider != model.PaymentProviderPlisio {
-		logger.LogWarn(ctx, fmt.Sprintf("Plisio webhook 订单支付网关不匹配 trade_no=%s payment_provider=%s client_ip=%s", payload.OrderNumber, topUp.PaymentProvider, callerIP))
-		c.Status(http.StatusOK)
+	alreadyDone, err := model.RechargePlisio(payload.OrderNumber, sourceAmount, callerIP)
+	if err != nil {
+		logger.LogError(ctx, fmt.Sprintf("Plisio credit failed trade_no=%s error=%q", payload.OrderNumber, err.Error()))
+		if errors.Is(err, model.ErrTopUpAmountMismatch) || errors.Is(err, model.ErrPaymentMethodMismatch) || errors.Is(err, model.ErrTopUpStatusInvalid) || errors.Is(err, model.ErrTopUpNotFound) {
+			c.AbortWithStatus(http.StatusBadRequest)
+		} else {
+			c.AbortWithStatus(http.StatusInternalServerError)
+		}
 		return
 	}
-	if topUp.Status != common.TopUpStatusPending {
-		logger.LogInfo(ctx, fmt.Sprintf("Plisio webhook 订单状态非 pending，忽略 trade_no=%s status=%s client_ip=%s", payload.OrderNumber, topUp.Status, callerIP))
-		c.Status(http.StatusOK)
-		return
-	}
-
-	topUp.Status = common.TopUpStatusSuccess
-	topUp.CompleteTime = time.Now().Unix()
-	if err := topUp.Update(); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("Plisio 更新充值订单状态失败 trade_no=%s client_ip=%s error=%q", payload.OrderNumber, callerIP, err.Error()))
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	dAmount := decimal.NewFromInt(int64(topUp.Amount))
-	dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-	quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
-	if err := model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("Plisio 增加用户额度失败 trade_no=%s user_id=%d quota=%d error=%q", payload.OrderNumber, topUp.UserId, quotaToAdd, err.Error()))
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	model.RecordTopupLog(topUp.UserId, fmt.Sprintf("使用加密货币充值成功，充值金额：%s，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money), callerIP, model.PaymentMethodPlisio, "plisio")
-	logger.LogInfo(ctx, fmt.Sprintf("Plisio 充值成功 trade_no=%s user_id=%d quota=%d client_ip=%s", payload.OrderNumber, topUp.UserId, quotaToAdd, callerIP))
+	logger.LogInfo(ctx, fmt.Sprintf("Plisio credit completed trade_no=%s already_done=%t", payload.OrderNumber, alreadyDone))
 	c.Status(http.StatusOK)
 }
 
 // plisioIPN captures the fields Plisio sends in an IPN callback. Only the
 // fields used for routing/fulfillment are typed; the rest are ignored.
 type plisioIPN struct {
-	TxnID       string `json:"txn_id"`
-	OrderNumber string `json:"order_number"`
-	OrderName   string `json:"order_name"`
-	Status      string `json:"status"`
-	VerifyHash  string `json:"verify_hash"`
+	TxnID        string            `json:"txn_id"`
+	OrderNumber  string            `json:"order_number"`
+	OrderName    string            `json:"order_name"`
+	Status       string            `json:"status"`
+	VerifyHash   string            `json:"verify_hash"`
+	SourceAmount common.RawMessage `json:"source_amount"`
 }
 
 // verifyPlisioSignature recomputes the Plisio verify_hash (HMAC-SHA1 over the
@@ -371,7 +363,7 @@ func plisioCanonicalBody(rawBody []byte) (string, error) {
 			sb.WriteByte(',')
 		}
 		first = false
-		encodedKey, err := json.Marshal(key)
+		encodedKey, err := common.Marshal(key)
 		if err != nil {
 			return "", err
 		}
@@ -391,7 +383,11 @@ func getPlisioMinTopup() int64 {
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dMinTopup := decimal.NewFromInt(int64(minTopup))
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-		minTopup = int(dMinTopup.Mul(dQuotaPerUnit).IntPart())
+		quota, err := common.WalletQuotaFromDecimalStrict(dMinTopup.Mul(dQuotaPerUnit))
+		if err != nil {
+			return common.MaxWalletQuota
+		}
+		minTopup = quota
 	}
 	return int64(minTopup)
 }

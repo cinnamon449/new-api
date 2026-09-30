@@ -82,7 +82,7 @@ func TestTwoFALoginInvalidBackupCodePreservesLocalizedErrorAndFailureAccounting(
 				user, _ := setupSecurityEnrollmentTest(t)
 				factor := &model.TwoFA{UserId: user.Id, Secret: "JBSWY3DPEHPK3PXP", IsEnabled: true}
 				require.NoError(t, model.DB.Create(factor).Error)
-				challenge, err := service.StartLoginVerification(user, "password")
+				challenge, err := service.StartLoginVerification(user, "password", nil)
 				require.NoError(t, err)
 				require.NotNil(t, challenge)
 				body, err := common.Marshal(map[string]string{"flow_token": challenge.FlowToken, "code": "ABCD-1234"})

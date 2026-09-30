@@ -67,6 +67,24 @@ type AccountLoginMethods struct {
 	CustomProviderIDs []int
 }
 
+// RemoveRecoveryEmailForSession binds removal to the email observed when the
+// proof was issued and validates the active session under the user lock.
+func RemoveRecoveryEmailForSession(identity AuthSessionIdentity, email string) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := ValidateAuthSessionWithTx(tx, identity); err != nil {
+			return err
+		}
+		var current User
+		if err := tx.First(&current, identity.UserID).Error; err != nil {
+			return err
+		}
+		if NormalizeEmail(current.Email) != NormalizeEmail(email) {
+			return ErrAccountBindingChanged
+		}
+		return tx.Model(&current).Update("email", "").Error
+	})
+}
+
 func UnbindUserOAuthForSession(identity AuthSessionIdentity, providerID int, enabled AccountLoginMethods) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
 		if err := ValidateAuthSessionWithTx(tx, identity); err != nil {
@@ -148,4 +166,26 @@ func UpdateUserOAuthBindingForSessionWithTx(tx *gorm.DB, identity AuthSessionIde
 	}
 	// The existing unique provider/subject index rejects concurrent ownership.
 	return tx.Model(&binding).Update("provider_user_id", subject).Error
+}
+
+// MigrateLegacyGitHubBindingWithTx rewrites a login-name GitHub binding to the
+// numeric account ID once the login flow has confirmed the account. It reports
+// whether the row was rewritten; a row whose binding changed since it was read
+// is left untouched.
+func MigrateLegacyGitHubBindingWithTx(tx *gorm.DB, userID int, legacyID, gitHubID string) (bool, error) {
+	if userID <= 0 || legacyID == "" || gitHubID == "" {
+		return false, ErrAccountBindingChanged
+	}
+	var count int64
+	if err := tx.Model(&User{}).Where("github_id = ? AND id <> ?", gitHubID, userID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	if count != 0 {
+		return false, ErrExternalIdentityAlreadyClaimed
+	}
+	result := tx.Model(&User{}).Where("id = ? AND github_id = ?", userID, legacyID).Update("github_id", gitHubID)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
 }
