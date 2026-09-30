@@ -2,16 +2,22 @@ package model
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/glebarez/sqlite"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func setupUserUpdateTestState(t *testing.T) {
@@ -512,7 +518,7 @@ func TestUserAccessTokenLimitAndOwnership(t *testing.T) {
 	require.NoError(t, DB.Model(&UserAccessToken{}).Where("user_id = ?", owner.Id).Count(&count).Error)
 	assert.EqualValues(t, 20, count)
 
-	_, err := RenameUserAccessToken(other.Id, first.Id, "stolen")
+	_, err := UpdateUserAccessToken(other.Id, first.Id, "stolen", []string{"profile:read"})
 	require.ErrorIs(t, err, ErrAccessTokenNotFound)
 	_, err = DeleteUserAccessToken(other.Id, first.Id)
 	require.ErrorIs(t, err, ErrAccessTokenNotFound)
@@ -520,15 +526,89 @@ func TestUserAccessTokenLimitAndOwnership(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, first.Name, stored.Name)
 
-	renamed, err := RenameUserAccessToken(owner.Id, first.Id, "renamed")
+	assert.Equal(t, first.Scopes, stored.Scopes)
+
+	renamed, err := UpdateUserAccessToken(owner.Id, first.Id, "renamed", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "renamed", renamed.Name)
+	assert.Equal(t, first.Scopes, renamed.Scopes, "a rename keeps the grant")
+	regranted, err := UpdateUserAccessToken(owner.Id, first.Id, "regranted", []string{"usage:read"})
+	require.NoError(t, err)
+	assert.Equal(t, "regranted", regranted.Name)
+	assert.Equal(t, []string{"usage:read"}, regranted.GetScopes())
 	deleted, err := DeleteUserAccessToken(owner.Id, first.Id)
 	require.NoError(t, err)
 	assert.Equal(t, first.TokenHash, deleted.TokenHash)
 	found, err := FindUserAccessTokenByHash(first.TokenHash)
 	require.NoError(t, err)
 	assert.Nil(t, found)
+}
+
+func TestUserAccessTokenUpdateDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(filepath.Join(t.TempDir(), "access-tokens.db"))
+			case "mysql":
+				dsn := os.Getenv("TEST_MYSQL_DSN")
+				if dsn == "" {
+					t.Skip("TEST_MYSQL_DSN is not configured")
+				}
+				driver = mysql.Open(dsn)
+			case "postgres":
+				dsn := os.Getenv("TEST_POSTGRES_DSN")
+				if dsn == "" {
+					t.Skip("TEST_POSTGRES_DSN is not configured")
+				}
+				driver = postgres.Open(dsn)
+			}
+			db, err := gorm.Open(driver, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			previousDB := DB
+			DB = db
+			t.Cleanup(func() {
+				DB = previousDB
+				require.NoError(t, sqlDB.Close())
+			})
+			var version string
+			query := "select version()"
+			if dialect == "sqlite" {
+				query = "select sqlite_version()"
+			}
+			require.NoError(t, db.Raw(query).Scan(&version).Error)
+			t.Logf("%s version: %s", dialect, version)
+			require.NoError(t, db.AutoMigrate(&UserAccessToken{}))
+			token := UserAccessToken{
+				UserId: 7, Name: "QA grant", TokenHash: AccessTokenFingerprint(common.GetUUID()),
+				ExpiresAt: time.Now().Add(time.Hour).Unix(),
+			}
+			require.NoError(t, token.SetScopes([]string{"profile:read"}))
+			require.NoError(t, db.Create(&token).Error)
+			t.Cleanup(func() { require.NoError(t, db.Delete(&token).Error) })
+
+			_, err = UpdateUserAccessToken(8, token.Id, "wrong owner", []string{"usage:read"})
+			require.ErrorIs(t, err, ErrAccessTokenNotFound)
+			stored, err := GetUserAccessToken(7, token.Id)
+			require.NoError(t, err)
+			assert.Equal(t, token.Name, stored.Name)
+			assert.Equal(t, []string{"profile:read"}, stored.GetScopes())
+
+			renamed, err := UpdateUserAccessToken(7, token.Id, "QA renamed", nil)
+			require.NoError(t, err)
+			assert.Equal(t, "QA renamed", renamed.Name)
+			assert.Equal(t, []string{"profile:read"}, renamed.GetScopes())
+			regranted, err := UpdateUserAccessToken(7, token.Id, "QA regranted", []string{"usage:read"})
+			require.NoError(t, err)
+			assert.Equal(t, "QA regranted", regranted.Name)
+			assert.Equal(t, []string{"usage:read"}, regranted.GetScopes())
+			assert.Equal(t, token.TokenHash, regranted.TokenHash)
+			assert.Equal(t, token.ExpiresAt, regranted.ExpiresAt)
+		})
+	}
 }
 
 func TestDisablingUserKeepsAccessTokensAndDeletingRemovesThem(t *testing.T) {
