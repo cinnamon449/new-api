@@ -56,6 +56,6 @@ func RechargePlisio(tradeNo string, sourceAmount decimal.Decimal, callerIP strin
 		return alreadyDone, err
 	}
 	syncCreditUserQuotaCache(topUp.UserId, quota, "plisio topup")
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用加密货币充值成功，充值金额：%s，支付金额：%f", logger.LogQuota(quota), topUp.Money), callerIP, PaymentMethodPlisio, PaymentProviderPlisio)
+	RecordTopupLog(topUp.UserId, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"provider": "Plisio", "quota": logger.FormatQuota(quota), "amount": fmt.Sprintf("%f", topUp.Money)}), callerIP, PaymentMethodPlisio, PaymentProviderPlisio)
 	return false, nil
 }

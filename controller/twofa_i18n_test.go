@@ -34,7 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTwoFACodeInvalidReturnsStableCodeAndLocalizedMessage(t *testing.T) {
+func TestTwoFACodeInvalidReturnsStableCodeAndTranslationKey(t *testing.T) {
 	require.NoError(t, i18n.Init())
 	gin.SetMode(gin.TestMode)
 
@@ -43,7 +43,7 @@ func TestTwoFACodeInvalidReturnsStableCodeAndLocalizedMessage(t *testing.T) {
 		message  string
 	}{
 		{language: "en", message: "Verification code or backup code is incorrect"},
-		{language: "zh-CN", message: "验证码或备用码不正确"},
+		{language: "zh-CN", message: "Verification code or backup code is incorrect"},
 	}
 
 	for _, test := range tests {
@@ -57,26 +57,28 @@ func TestTwoFACodeInvalidReturnsStableCodeAndLocalizedMessage(t *testing.T) {
 			writeSecurityOperationError(context, model.ErrTwoFACodeInvalid)
 
 			var response struct {
-				Success bool   `json:"success"`
-				Code    string `json:"code"`
-				Message string `json:"message"`
+				Success    bool   `json:"success"`
+				Code       string `json:"code"`
+				Message    string `json:"message"`
+				MessageKey string `json:"message_key"`
 			}
 			require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
 			assert.False(t, response.Success)
 			assert.Equal(t, "TWOFA_CODE_INVALID", response.Code)
 			assert.Equal(t, test.message, response.Message)
+			assert.Equal(t, test.message, response.MessageKey)
 		})
 	}
 }
 
-func TestTwoFALoginInvalidBackupCodePreservesLocalizedErrorAndFailureAccounting(t *testing.T) {
+func TestTwoFALoginInvalidBackupCodePreservesErrorContractAndFailureAccounting(t *testing.T) {
 	for _, path := range []string{"/api/user/login/2fa", "/api/user/login/verify"} {
 		for _, test := range []struct {
 			language string
 			message  string
 		}{
 			{language: "en", message: "Verification code or backup code is incorrect"},
-			{language: "zh-CN", message: "验证码或备用码不正确"},
+			{language: "zh-CN", message: "Verification code or backup code is incorrect"},
 		} {
 			t.Run(path+"/"+test.language, func(t *testing.T) {
 				user, _ := setupSecurityEnrollmentTest(t)

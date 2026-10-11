@@ -197,6 +197,18 @@ func TestPlisioWebhookSettlement(t *testing.T) {
 				var count int64
 				require.NoError(t, model.LOG_DB.Model(&model.Log{}).Where("user_id = ?", user.Id).Count(&count).Error)
 				require.EqualValues(t, 1, count)
+				var topupLog model.Log
+				require.NoError(t, model.LOG_DB.Where("user_id = ?", user.Id).First(&topupLog).Error)
+				require.Equal(t, model.LogTypeTopup, topupLog.Type)
+				var metadata struct {
+					ContentParts []*common.Message `json:"content_parts"`
+				}
+				require.NoError(t, common.UnmarshalJsonStr(topupLog.Other, &metadata))
+				require.Len(t, metadata.ContentParts, 1)
+				require.Equal(t, "{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", metadata.ContentParts[0].Key)
+				require.Equal(t, "Plisio", metadata.ContentParts[0].Params["provider"])
+				require.Equal(t, fmt.Sprintf("%f", order.Money), metadata.ContentParts[0].Params["amount"])
+				require.Equal(t, metadata.ContentParts[0].Error(), topupLog.Content)
 			} else {
 				require.Equal(t, common.TopUpStatusPending, order.Status)
 				require.Zero(t, order.CompleteTime)
