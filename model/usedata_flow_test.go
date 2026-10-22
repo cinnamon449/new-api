@@ -1,15 +1,92 @@
 package model
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func seedFlowQuotaData(t *testing.T, quotaData QuotaData) {
 	t.Helper()
 	require.NoError(t, DB.Create(&quotaData).Error)
+}
+
+func TestQuotaDataCacheCountersDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			dsn := "local"
+			if dialect == "mysql" {
+				dsn = os.Getenv("TEST_MYSQL_DSN")
+			} else if dialect == "postgres" {
+				dsn = os.Getenv("TEST_POSTGRES_DSN")
+			}
+			if dsn == "" {
+				t.Skip("test database DSN is not configured")
+			}
+			previousDB, previousType, previousPath := DB, common.MainDatabaseType(), common.SQLitePath
+			previousCache := CacheQuotaData
+			common.SQLitePath = filepath.Join(t.TempDir(), "quota.db")
+			t.Setenv("QUOTA_COUNTER_TEST_DSN", dsn)
+			db, dbType, err := chooseDB("QUOTA_COUNTER_TEST_DSN", false)
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			DB = db
+			common.SetMainDatabaseType(dbType)
+			initCol()
+			CacheQuotaData = make(map[string]*QuotaData)
+			t.Cleanup(func() {
+				assert.NoError(t, db.Migrator().DropTable(&QuotaData{}))
+				assert.NoError(t, sqlDB.Close())
+				DB, common.SQLitePath, CacheQuotaData = previousDB, previousPath, previousCache
+				common.SetMainDatabaseType(previousType)
+				initCol()
+			})
+			require.NoError(t, db.AutoMigrate(&QuotaData{}))
+			// Merge two requests in memory, then update the persisted hourly row.
+			for i, quantity := range []struct{ read, write int64 }{{8, 3}, {4, 2}, {-3, -5}, {2, 1}} {
+				LogQuotaData(QuotaDataLogParams{
+					UserID: 1, Username: "sync-qa", ModelName: "sync-qa-model",
+					CreatedAt: 3661, UseGroup: "default", TokenID: 1, ChannelID: 1,
+					Quota: 5, TokenUsed: 10, CacheReadTokens: quantity.read, CacheCreationTokens: quantity.write,
+				})
+				if i == 1 || i == 3 {
+					SaveQuotaDataCache()
+				}
+			}
+			var stored []QuotaData
+			require.NoError(t, db.Find(&stored).Error)
+			require.Len(t, stored, 1)
+			assert.EqualValues(t, 14, stored[0].CacheReadTokens)
+			assert.EqualValues(t, 6, stored[0].CacheCreationTokens)
+			assert.Equal(t, 4, stored[0].Count)
+			assert.Equal(t, 20, stored[0].Quota)
+			assert.Equal(t, 40, stored[0].TokenUsed)
+			assert.EqualValues(t, 3600, stored[0].CreatedAt)
+			queries := map[string]func() ([]*QuotaData, error){
+				"username":   func() ([]*QuotaData, error) { return GetQuotaDataByUsername("sync-qa", 0, 7200) },
+				"user_id":    func() ([]*QuotaData, error) { return GetQuotaDataByUserId(1, 0, 7200) },
+				"by_user":    func() ([]*QuotaData, error) { return GetQuotaDataGroupByUser(0, 7200) },
+				"all_models": func() ([]*QuotaData, error) { return GetAllQuotaDates(0, 7200, "") },
+			}
+			for name, query := range queries {
+				t.Run(name, func(t *testing.T) {
+					rows, err := query()
+					require.NoError(t, err)
+					require.Len(t, rows, 1)
+					assert.EqualValues(t, 14, rows[0].CacheReadTokens)
+					assert.EqualValues(t, 6, rows[0].CacheCreationTokens)
+					assert.Equal(t, 4, rows[0].Count)
+					assert.Equal(t, 20, rows[0].Quota)
+					assert.Equal(t, 40, rows[0].TokenUsed)
+				})
+			}
+		})
+	}
 }
 
 func seedFlowLookupData(t *testing.T) {
