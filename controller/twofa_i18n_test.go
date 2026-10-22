@@ -42,8 +42,8 @@ func TestTwoFACodeInvalidReturnsStableCodeAndTranslationKey(t *testing.T) {
 		language string
 		message  string
 	}{
-		{language: "en", message: "Verification code or backup code is incorrect"},
-		{language: "zh-CN", message: "Verification code or backup code is incorrect"},
+		{language: "en", message: "The authenticator code is incorrect."},
+		{language: "zh-CN", message: "The authenticator code is incorrect."},
 	}
 
 	for _, test := range tests {
@@ -77,8 +77,8 @@ func TestTwoFALoginInvalidBackupCodePreservesErrorContractAndFailureAccounting(t
 			language string
 			message  string
 		}{
-			{language: "en", message: "Verification code or backup code is incorrect"},
-			{language: "zh-CN", message: "Verification code or backup code is incorrect"},
+			{language: "en", message: "Verification failed. Please try again."},
+			{language: "zh-CN", message: "Verification failed. Please try again."},
 		} {
 			t.Run(path+"/"+test.language, func(t *testing.T) {
 				user, _ := setupSecurityEnrollmentTest(t)
@@ -104,8 +104,9 @@ func TestTwoFALoginInvalidBackupCodePreservesErrorContractAndFailureAccounting(t
 				require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
 				assert.Equal(t, http.StatusOK, response.Code)
 				assert.False(t, result.Success)
-				assert.Equal(t, "TWOFA_CODE_INVALID", result.Code)
+				assert.Equal(t, "SECURITY_VERIFICATION_FAILED", result.Code)
 				assert.Equal(t, test.message, result.Message)
+				assert.Equal(t, test.message, result.MessageKey)
 				assert.Empty(t, response.Header().Values("Set-Cookie"))
 				stored, err := model.GetTwoFAByUserId(user.Id)
 				require.NoError(t, err)

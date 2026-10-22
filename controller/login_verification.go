@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -33,9 +32,6 @@ func VerifyLogin(c *gin.Context) {
 	}
 	bundle, migration, err := service.VerifyLoginCode(request.FlowToken, request.Code, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
-		if errors.Is(err, service.ErrVerificationFailed) {
-			err = model.ErrTwoFACodeInvalid
-		}
 		writeSecurityOperationError(c, err)
 		return
 	}

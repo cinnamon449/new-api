@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import i18next from 'i18next'
 import { describe, expect, test } from 'vitest'
 
+import zh from '@/i18n/locales/zh.json'
+
 import {
   getServerErrorMessage,
   getServerErrorMessageKey,
@@ -118,12 +120,30 @@ describe('server error message mapping', () => {
       await i18next.changeLanguage('en')
     }
   })
-  test('maps an invalid 2FA code without exposing the server language', () => {
-    expect(
-      getServerErrorMessageKey({
-        code: 'TWOFA_CODE_INVALID',
-        message: '验证码或备用码不正确',
-      })
-    ).toBe('Verification code or backup code is incorrect')
+  test('translates an invalid 2FA code in the interface language regardless of server text', async () => {
+    const failure = {
+      code: 'TWOFA_CODE_INVALID',
+      message: '验证码或备用码不正确',
+    }
+    expect(getServerErrorMessageKey(failure)).toBe(
+      'The authenticator code is incorrect.'
+    )
+    const originalLanguage = i18next.language
+    const originalChinese = {
+      ...i18next.getResourceBundle('zhCN', 'translation'),
+    }
+    i18next.addResourceBundle('zhCN', 'translation', zh.translation)
+    try {
+      await i18next.changeLanguage('en')
+      expect(getServerErrorMessage(failure)).toBe(
+        'The authenticator code is incorrect.'
+      )
+      await i18next.changeLanguage('zhCN')
+      expect(getServerErrorMessage(failure)).toBe('认证器验证码错误。')
+    } finally {
+      i18next.removeResourceBundle('zhCN', 'translation')
+      i18next.addResourceBundle('zhCN', 'translation', originalChinese)
+      await i18next.changeLanguage(originalLanguage)
+    }
   })
 })

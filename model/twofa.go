@@ -191,7 +191,7 @@ func replaceBackupCodesWithAuthVersion(userId int, codes []string, identity *Aut
 // ValidateBackupCode 验证并使用备用码
 func ValidateBackupCode(userId int, code string) (bool, error) {
 	if !common.ValidateBackupCode(code) {
-		return false, ErrTwoFACodeInvalid
+		return false, errors.New("the verification code or backup code is incorrect")
 	}
 
 	normalizedCode := common.NormalizeBackupCode(code)

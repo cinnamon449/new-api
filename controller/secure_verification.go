@@ -103,7 +103,7 @@ func writeSecurityOperationError(c *gin.Context, err error) {
 		status = http.StatusConflict
 		code, message = "TWOFA_SETUP_INVALID", model.ErrTwoFASetupInvalid.Error()
 	case errors.Is(err, model.ErrTwoFACodeInvalid):
-		code, message = "TWOFA_CODE_INVALID", "Verification code or backup code is incorrect"
+		code, message = "TWOFA_CODE_INVALID", model.ErrTwoFACodeInvalid.Error()
 	case errors.Is(err, model.ErrTwoFAAlreadyEnabled):
 		code, message = "TWOFA_ALREADY_ENABLED", "Two-factor authentication is already enabled."
 	case errors.Is(err, model.ErrTwoFANotEnabled):

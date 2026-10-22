@@ -6978,7 +6978,6 @@
     "Vendors source": "ベンダーの取得元",
     "Vendors still have {{count}} linked model records. Transfer or clear their assignments first.": "まだ {{count}} 件の関連モデルがあります。先に割り当てを移動または解除してください。",
     "Verification code": "確認コード",
-    "Verification code or backup code is incorrect": "認証コードまたはバックアップコードが正しくありません。",
     "Verification Code": "認証コード",
     "Verification code must be 6 digits": "認証コードは6桁である必要があります",
     "Verification code sent! Please check your email.": "認証コードを送信しました！メールを確認してください。",

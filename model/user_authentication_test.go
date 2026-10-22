@@ -207,13 +207,6 @@ func TestValidateBackupCodeCanOnlySucceedOnce(t *testing.T) {
 	assert.Zero(t, remaining)
 }
 
-func TestValidateBackupCodeReturnsStableErrorForInvalidFormat(t *testing.T) {
-	valid, err := ValidateBackupCode(123, "123456")
-
-	assert.False(t, valid)
-	assert.ErrorIs(t, err, ErrTwoFACodeInvalid)
-}
-
 func TestPendingTwoFASetupAPIsRejectEnabledFactor(t *testing.T) {
 	truncateTables(t)
 

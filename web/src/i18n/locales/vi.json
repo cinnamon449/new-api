@@ -6978,7 +6978,6 @@
     "Vendors source": "Nguồn nhà cung cấp",
     "Vendors still have {{count}} linked model records. Transfer or clear their assignments first.": "Nhà cung cấp vẫn còn {{count}} bản ghi mô hình liên kết. Hãy chuyển hoặc xóa gán trước.",
     "Verification code": "Mã xác minh",
-    "Verification code or backup code is incorrect": "Mã xác minh hoặc mã dự phòng không chính xác.",
     "Verification Code": "Mã xác minh",
     "Verification code must be 6 digits": "Mã xác thực phải có 6 chữ số",
     "Verification code sent! Please check your email.": "Mã xác thực đã được gửi! Vui lòng kiểm tra email của bạn.",

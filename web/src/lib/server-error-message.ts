@@ -44,7 +44,7 @@ const serverErrorMessageKeys = {
     'Two-factor authentication is temporarily locked.',
   OAUTH_ACCOUNT_MISMATCH:
     'The OAuth account does not match the account linked to your profile.',
-  TWOFA_CODE_INVALID: 'Verification code or backup code is incorrect',
+  TWOFA_CODE_INVALID: 'The authenticator code is incorrect.',
   TWOFA_ALREADY_ENABLED: 'Two-factor authentication is already enabled.',
   TWOFA_NOT_ENABLED: 'Two-factor authentication is not enabled.',
   PASSKEY_NOT_FOUND: 'No Passkey is registered.',
