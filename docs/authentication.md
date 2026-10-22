@@ -149,7 +149,7 @@ Redis 限流使用原子 Lua 固定窗口，替代旧的近似滑动窗口 List 
 - 每个用户最多 20 个令牌，存放在 `user_access_tokens` 表。创建时必须选择 scope 和过期时间：默认 30 天，最短 1 小时，也允许永不过期（界面会提示风险）。过期令牌立即失效，超过保留期后由 master 节点清理。
 - scope 形如 `resource:action`。个人权限（资料、API 令牌、用量、钱包、账户安全）和部分后台权限由令牌目录定义；受 Casbin 保护的后台权限直接复用管理员权限矩阵的 resource 与 action。只能授予自己当前拥有的权限，并且每个请求都会重新读取角色和权限：撤回某项管理员权限后，携带该 scope 的令牌立即失去对应能力。
 - 每条面板路由都必须声明所需 scope。未声明的路由一律拒绝（403 `ACCESS_TOKEN_ROUTE_UNDECLARED`），scope 不足返回 403 `ACCESS_TOKEN_SCOPE_DENIED`，令牌过期返回 401 `ACCESS_TOKEN_EXPIRED`。
-- PAT 不能创建、改名或撤销 PAT，也不能管理登录会话或调用 InterAPI 的恢复邮箱移除接口；这些接口只接受浏览器登录会话。
+- PAT 不能创建、改名或撤销 PAT，也不能管理登录会话；这些接口只接受浏览器登录会话。
 - PAT 可以完成二次验证，Proof 绑定到该令牌，并且令牌必须持有该操作对应的 scope：`channel.key.read` 需要 `channel:secret_view`，`admin.user.*` 需要 `user:write`，本人的密码、2FA、Passkey、账号绑定和注销需要 `account_security:write`。PAT 不能使用 OAuth 验证方式。
 - 通过 PAT 完成的安全变更（如修改密码、2FA、Passkey）会让该用户的所有浏览器登录会话下线，令牌本身保持可用。
 - 用户被禁用期间，其令牌全部不可用，重新启用后恢复；注销或删除用户时，其令牌被删除。
@@ -166,7 +166,6 @@ OAuth state、2FA pending、Passkey ceremony、Telegram bind 等临时状态存�
 - `channel.key.read`：查看渠道密钥；
 - `passkey.register`：注册 Passkey；
 - `passkey.delete`：删除 Passkey；
-- `account.email.remove`（`{"email"}`）：InterAPI 的 `DELETE /api/user/self/email`，context 必须与当前恢复邮箱匹配，只接受浏览器登录会话。删除和会话验证在同一事务内完成，旧 Proof 不能删除后来绑定的地址。
 
 管理员对其他用户执行的高风险操作同样要求 Proof，且 scope 的 context 绑定被操作用户，签发给某个用户的 Proof 不能改用于另一个用户或另一种动作：
 

@@ -10,10 +10,6 @@ import (
 	"github.com/QuantumNous/new-api/setting/system_setting"
 )
 
-func RemoveAccountEmail(identity AuthIdentity, email string) error {
-	return model.RemoveRecoveryEmailForSession(identity, email)
-}
-
 func UnbindAccountOAuth(identity AuthIdentity, providerID int) error {
 	enabled := model.AccountLoginMethods{
 		Password: common.PasswordLoginEnabled,

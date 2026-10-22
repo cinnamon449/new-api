@@ -33,7 +33,6 @@ const (
 	VerificationScopeAccessTokenUpdate   = "access_token.update"
 	VerificationScopeAccountBind         = "account.binding.bind"
 	VerificationScopeAccountUnbind       = "account.binding.unbind"
-	VerificationScopeEmailRemove         = "account.email.remove"
 	VerificationScopePasswordSet         = "account.password.set"
 	VerificationScopePasswordChange      = "account.password.change"
 	VerificationScopeAccountDelete       = "account.delete"
@@ -199,18 +198,6 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}
 		normalized = context
-	case VerificationScopeEmailRemove:
-		var context struct {
-			Email string `json:"email"`
-		}
-		if len(fields) != 1 || common.Unmarshal(fields["email"], &context.Email) != nil {
-			return VerificationBinding{}, ErrVerificationContextInvalid
-		}
-		context.Email = model.NormalizeEmail(context.Email)
-		if context.Email != "" && common.Validate.Var(context.Email, "email") != nil {
-			return VerificationBinding{}, ErrVerificationContextInvalid
-		}
-		normalized = context
 	case VerificationScopeAdminUserUpdate, VerificationScopeAdminUserDelete, VerificationScopeAdminUserPasskeyReset, VerificationScopeAdminUserTwoFADisable:
 		var context AdminUserContext
 		if len(fields) != 1 || common.Unmarshal(fields["user_id"], &context.UserID) != nil || context.UserID <= 0 {
@@ -339,7 +326,7 @@ func securityVerificationPolicy(scope string, state model.UserVerificationState)
 		}
 	case VerificationScopePasskeyRegister, VerificationScopeTwoFASetup,
 		VerificationScopeAccessTokenGenerate, VerificationScopeAccessTokenUpdate, VerificationScopeAccessTokenRevoke,
-		VerificationScopeAccountBind, VerificationScopeAccountUnbind, VerificationScopeEmailRemove,
+		VerificationScopeAccountBind, VerificationScopeAccountUnbind,
 		VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete,
 		VerificationScopeAdminUserCreate, VerificationScopeAdminUserUpdate, VerificationScopeAdminUserDelete,
 		VerificationScopeAdminUserManage, VerificationScopeAdminUserPasskeyReset,
@@ -405,7 +392,7 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 	for i := range methods {
 		if methods[i].Method == VerificationMethodPassword && !common.PasswordLoginEnabled {
 			switch scope {
-			case VerificationScopeAccountBind, VerificationScopeAccountUnbind, VerificationScopeEmailRemove, VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete,
+			case VerificationScopeAccountBind, VerificationScopeAccountUnbind, VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete,
 				VerificationScopeAdminUserCreate, VerificationScopeAdminUserUpdate, VerificationScopeAdminUserDelete,
 				VerificationScopeAdminUserManage, VerificationScopeAdminUserPasskeyReset,
 				VerificationScopeAdminUserTwoFADisable, VerificationScopeAdminUserBindingClear:

@@ -1009,40 +1009,6 @@ func DeleteSelf(c *gin.Context) {
 	})
 }
 
-func RemoveSelfEmail(c *gin.Context) {
-	identity, ok := middleware.GetSessionAuthIdentity(c)
-	if !ok {
-		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
-		return
-	}
-	user, err := model.GetUserById(identity.UserID, false)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-
-	context, err := common.Marshal(map[string]string{"email": user.Email})
-	if err != nil {
-		writeSecurityOperationError(c, err)
-		return
-	}
-	if middleware.RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopeEmailRemove, Context: context}) == nil {
-		return
-	}
-	if err := service.RemoveAccountEmail(identity, user.Email); err != nil {
-		writeSecurityOperationError(c, err)
-		return
-	}
-	notificationFailed := service.NotifyAccountSecurityChange(user.Email, "Recovery email removed") != nil
-	recordUserSecurityAudit(c, identity.UserID, "user.binding_unbind", map[string]any{"provider": "email", "success": true, "notification_failed": notificationFailed})
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    gin.H{"notification_warning": notificationFailed},
-	})
-}
-
 func CreateUser(c *gin.Context) {
 	var user model.User
 	err := common.DecodeJson(c.Request.Body, &user)

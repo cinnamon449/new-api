@@ -234,7 +234,6 @@ var accessTokenVerificationScopes = map[string]string{
 	VerificationScopePasswordChange:        "account_security:write",
 	VerificationScopeAccountBind:           "account_security:write",
 	VerificationScopeAccountUnbind:         "account_security:write",
-	VerificationScopeEmailRemove:           "",
 	VerificationScopeAccountDelete:         "account_security:write",
 	VerificationScopeAccessTokenGenerate:   "",
 	VerificationScopeAccessTokenUpdate:     "",

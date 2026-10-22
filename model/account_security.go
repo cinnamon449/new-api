@@ -67,24 +67,6 @@ type AccountLoginMethods struct {
 	CustomProviderIDs []int
 }
 
-// RemoveRecoveryEmailForSession binds removal to the email observed when the
-// proof was issued and validates the active session under the user lock.
-func RemoveRecoveryEmailForSession(identity AuthSessionIdentity, email string) error {
-	return DB.Transaction(func(tx *gorm.DB) error {
-		if err := ValidateAuthSessionWithTx(tx, identity); err != nil {
-			return err
-		}
-		var current User
-		if err := tx.First(&current, identity.UserID).Error; err != nil {
-			return err
-		}
-		if NormalizeEmail(current.Email) != NormalizeEmail(email) {
-			return ErrAccountBindingChanged
-		}
-		return tx.Model(&current).Update("email", "").Error
-	})
-}
-
 func UnbindUserOAuthForSession(identity AuthSessionIdentity, providerID int, enabled AccountLoginMethods) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
 		if err := ValidateAuthSessionWithTx(tx, identity); err != nil {
