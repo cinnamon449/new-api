@@ -59,6 +59,56 @@ func TestStreamResponseGeminiChat2OpenAIAttachesUsageMetadata(t *testing.T) {
 	require.Nil(t, withoutUsage.Usage)
 }
 
+func TestGeminiEmbeddingHandlersUseUpstreamUsageAndFallbackWhenMissing(t *testing.T) {
+	for _, surface := range []string{"openai", "native_single", "native_batch"} {
+		for _, upstream := range []bool{false, true} {
+			name := surface + "/estimated"
+			if upstream {
+				name = surface + "/upstream"
+			}
+			t.Run(name, func(t *testing.T) {
+				recorder := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(recorder)
+				c.Request = httptest.NewRequest(http.MethodPost, "/v1/embeddings", nil)
+				info := &relaycommon.RelayInfo{
+					ChannelMeta:            &relaycommon.ChannelMeta{UpstreamModelName: "gemini-embedding-001"},
+					IsGeminiBatchEmbedding: surface == "native_batch",
+				}
+				info.SetEstimatePromptTokens(11)
+				body := map[string]any{"embeddings": []any{map[string]any{"values": []float64{0.1}}}}
+				if surface == "native_single" {
+					body = map[string]any{"embedding": map[string]any{"values": []float64{0.1}}}
+				}
+				want := 11
+				if upstream {
+					body["usageMetadata"] = map[string]any{"promptTokenCount": 73}
+					want = 73
+				}
+				payload, err := common.Marshal(body)
+				require.NoError(t, err)
+				response := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(payload))}
+				var usage *dto.Usage
+				var apiErr *types.NewAPIError
+				if surface == "openai" {
+					usage, apiErr = GeminiEmbeddingHandler(c, info, response)
+				} else {
+					usage, apiErr = NativeGeminiEmbeddingHandler(c, response, info)
+					assert.JSONEq(t, string(payload), recorder.Body.String())
+				}
+				require.Nil(t, apiErr)
+				require.NotNil(t, usage)
+				assert.Equal(t, want, usage.PromptTokens)
+				assert.Equal(t, want, usage.TotalTokens)
+				assert.Zero(t, usage.CompletionTokens)
+				if upstream {
+					require.NotNil(t, usage.BillingUsage)
+					assert.False(t, usage.BillingUsage.Estimated)
+				}
+			})
+		}
+	}
+}
+
 func TestGeminiChatStreamHandlerClaudeFirstFrameUsesUpstreamUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
