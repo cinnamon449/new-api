@@ -67,7 +67,7 @@ func SetApiRouter(router *gin.Engine) {
 		// :env separates test vs prod URLs so the operator can register each
 		// in Pancake's matching webhook slot; handler enforces env match.
 		apiRouter.POST("/waffo-pancake/webhook/:env", anonymousRequestBodyLimit, controller.WaffoPancakeWebhook)
-		apiRouter.POST("/plisio/webhook", anonymousRequestBodyLimit, controller.PlisioWebhook)
+		apiRouter.POST("/nowpayments/webhook", anonymousRequestBodyLimit, controller.NowPaymentsWebhook)
 
 		// Universal secure verification routes
 		apiRouter.GET("/verify/methods", middleware.UserAuth(), middleware.DisableCache(), controller.GetVerificationMethods)
@@ -128,8 +128,8 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/stripe/pay", middleware.CriticalRateLimit(), controller.RequestStripePay)
 				selfRoute.POST("/stripe/amount", controller.RequestStripeAmount)
 				selfRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.RequestCreemPay)
-				selfRoute.POST("/plisio/amount", controller.RequestPlisioAmount)
-				selfRoute.POST("/plisio/pay", middleware.CriticalRateLimit(), controller.RequestPlisioPay)
+				selfRoute.POST("/nowpayments/amount", controller.RequestNowPaymentsAmount)
+				selfRoute.POST("/nowpayments/pay", middleware.CriticalRateLimit(), controller.RequestNowPaymentsPay)
 				selfRoute.POST("/waffo/amount", controller.RequestWaffoAmount)
 				selfRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPay)
 				selfRoute.POST("/waffo-pancake/amount", controller.RequestWaffoPancakeAmount)

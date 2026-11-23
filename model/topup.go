@@ -30,7 +30,7 @@ const (
 	PaymentMethodCreem        = "creem"
 	PaymentMethodWaffo        = "waffo"
 	PaymentMethodWaffoPancake = "waffo_pancake"
-	PaymentMethodPlisio       = "plisio"
+	PaymentMethodNowPayments  = "nowpayments"
 	PaymentMethodBalance      = "balance"
 )
 
@@ -40,7 +40,7 @@ const (
 	PaymentProviderCreem        = "creem"
 	PaymentProviderWaffo        = "waffo"
 	PaymentProviderWaffoPancake = "waffo_pancake"
-	PaymentProviderPlisio       = "plisio"
+	PaymentProviderNowPayments  = "nowpayments"
 	PaymentProviderBalance      = "balance"
 )
 

@@ -115,7 +115,7 @@ export interface PaymentProcessors {
   regular: (topupAmount: number, paymentType: string) => Promise<boolean>
   waffo: (topupAmount: number, payMethodIndex: number) => Promise<boolean>
   waffoPancake: (topupAmount: number) => Promise<boolean>
-  plisio: (topupAmount: number) => Promise<boolean>
+  nowpayments: (topupAmount: number) => Promise<boolean>
 }
 
 export async function dispatchSelectedPayment(
@@ -135,20 +135,20 @@ export async function dispatchSelectedPayment(
     return processors.waffoPancake(topupAmount)
   }
 
-  if (isPlisioPayment(paymentMethod.type)) {
-    return processors.plisio(topupAmount)
+  if (isNowPaymentsPayment(paymentMethod.type)) {
+    return processors.nowpayments(topupAmount)
   }
 
   return processors.regular(topupAmount, paymentMethod.type)
 }
 
 /**
- * Check if payment method is Plisio (crypto). Plisio returns a hosted invoice
+ * Check if payment method is NowPayments (crypto). NowPayments returns a hosted invoice
  * URL the buyer is redirected to (like Stripe's pay_link / Creem's
  * checkout_url), so it goes through a dedicated redirect flow.
  */
-export function isPlisioPayment(paymentType: string): boolean {
-  return paymentType === PAYMENT_TYPES.PLISIO
+export function isNowPaymentsPayment(paymentType: string): boolean {
+  return paymentType === PAYMENT_TYPES.NOWPAYMENTS
 }
 
 /**
@@ -176,8 +176,8 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
     return PAYMENT_TYPES.WAFFO_PANCAKE
   }
 
-  if (topupInfo.enable_plisio_topup) {
-    return PAYMENT_TYPES.PLISIO
+  if (topupInfo.enable_nowpayments_topup) {
+    return PAYMENT_TYPES.NOWPAYMENTS
   }
 
   return DEFAULT_PAYMENT_TYPE
@@ -207,8 +207,8 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
     return topupInfo.waffo_pancake_min_topup || DEFAULT_MIN_TOPUP
   }
 
-  if (topupInfo.enable_plisio_topup) {
-    return topupInfo.plisio_min_topup || DEFAULT_MIN_TOPUP
+  if (topupInfo.enable_nowpayments_topup) {
+    return topupInfo.nowpayments_min_topup || DEFAULT_MIN_TOPUP
   }
 
   return DEFAULT_MIN_TOPUP

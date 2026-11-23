@@ -20,29 +20,29 @@ import i18next from 'i18next'
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 
-import { requestPlisioPayment, isApiSuccess } from '../api'
+import { requestNowPaymentsPayment, isApiSuccess } from '../api'
 
 /**
- * Hook for handling Plisio (cryptocurrency) payment processing.
+ * Hook for handling NowPayments (cryptocurrency) payment processing.
  *
- * Creates a Plisio invoice and opens the hosted invoice page in a new tab,
+ * Creates a NowPayments invoice and opens the hosted invoice page in a new tab,
  * where the buyer selects a coin and pays. Order fulfillment happens
- * server-side via the Plisio IPN webhook.
+ * server-side via the NowPayments IPN webhook.
  */
-export function usePlisioPayment() {
+export function useNowPaymentsPayment() {
   const [processing, setProcessing] = useState(false)
 
-  const processPlisioPayment = useCallback(async (amount: number) => {
+  const processNowPaymentsPayment = useCallback(async (amount: number) => {
     setProcessing(true)
     try {
-      const response = await requestPlisioPayment({
+      const response = await requestNowPaymentsPayment({
         amount: Math.floor(amount),
-        payment_method: 'plisio',
+        payment_method: 'nowpayments',
       })
 
       if (isApiSuccess(response) && response.data?.invoice_url) {
         window.open(response.data.invoice_url, '_blank')
-        toast.success(i18next.t('Redirecting to Plisio checkout...'))
+        toast.success(i18next.t('Redirecting to NowPayments checkout...'))
         return true
       }
 
@@ -56,5 +56,5 @@ export function usePlisioPayment() {
     }
   }, [])
 
-  return { processing, processPlisioPayment }
+  return { processing, processNowPaymentsPayment }
 }

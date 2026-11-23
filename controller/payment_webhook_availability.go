@@ -114,17 +114,24 @@ func isEpayWebhookEnabled() bool {
 	return isEpayTopUpEnabled()
 }
 
-func isPlisioTopUpEnabled() bool {
+func isNowPaymentsTopUpEnabled() bool {
 	if !isPaymentComplianceConfirmed() {
 		return false
 	}
-	return strings.TrimSpace(setting.PlisioApiKey) != ""
+	if !setting.NowPaymentsEnabled {
+		return false
+	}
+	return strings.TrimSpace(setting.NowPaymentsApiKey) != "" &&
+		isNowPaymentsWebhookConfigured()
 }
 
-func isPlisioWebhookConfigured() bool {
-	return strings.TrimSpace(setting.PlisioApiKey) != ""
+func isNowPaymentsWebhookConfigured() bool {
+	return strings.TrimSpace(setting.NowPaymentsIpnSecret) != ""
 }
 
-func isPlisioWebhookEnabled() bool {
-	return isPlisioTopUpEnabled()
+// isNowPaymentsWebhookEnabled deliberately does not follow the gateway
+// toggle or compliance: those stop new invoices, while invoices already issued
+// must still settle when their payment arrives.
+func isNowPaymentsWebhookEnabled() bool {
+	return isNowPaymentsWebhookConfigured()
 }

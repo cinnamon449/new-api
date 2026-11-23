@@ -163,6 +163,7 @@ func main() {
 
 	// Plugin credential refresh before expiry, on the master node every minute
 	service.StartPluginCredentialRefreshTask()
+	controller.StartNowPaymentsReconcileTask()
 
 	// Subscription quota reset task (daily/weekly/monthly/custom)
 	service.StartSubscriptionQuotaResetTask()
