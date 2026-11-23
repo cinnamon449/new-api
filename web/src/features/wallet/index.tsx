@@ -41,7 +41,7 @@ import {
   useCreemPayment,
   useWaffoPayment,
   useWaffoPancakePayment,
-  usePlisioPayment,
+  useNowPaymentsPayment,
 } from './hooks'
 import {
   getDefaultPaymentType,
@@ -109,8 +109,8 @@ export function Wallet(props: WalletProps) {
   const { processing: waffoProcessing, processWaffoPayment } = useWaffoPayment()
   const { processing: pancakeProcessing, processWaffoPancakePayment } =
     useWaffoPancakePayment()
-  const { processing: plisioProcessing, processPlisioPayment } =
-    usePlisioPayment()
+  const { processing: nowPaymentsProcessing, processNowPaymentsPayment } =
+    useNowPaymentsPayment()
 
   // Fetch and refresh user data
   const fetchUser = useCallback(async () => {
@@ -205,7 +205,7 @@ export function Wallet(props: WalletProps) {
         regular: processPayment,
         waffo: processWaffoPayment,
         waffoPancake: processWaffoPancakePayment,
-        plisio: processPlisioPayment,
+        nowpayments: processNowPaymentsPayment,
       }
     )
 
@@ -365,7 +365,10 @@ export function Wallet(props: WalletProps) {
         paymentMethod={selectedPaymentMethod}
         calculating={calculating}
         processing={
-          processing || waffoProcessing || pancakeProcessing || plisioProcessing
+          processing ||
+          waffoProcessing ||
+          pancakeProcessing ||
+          nowPaymentsProcessing
         }
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}

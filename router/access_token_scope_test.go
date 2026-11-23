@@ -59,7 +59,7 @@ var accessTokenExemptRoutes = []string{
 	"POST /api/user/auth/logout",
 
 	// Payment callbacks.
-	"POST /api/plisio/webhook",
+	"POST /api/nowpayments/webhook",
 	"POST /api/stripe/webhook",
 	"POST /api/creem/webhook",
 	"POST /api/waffo/webhook",

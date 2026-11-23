@@ -53,9 +53,13 @@ const defaults: PaymentValues = {
   CreemWebhookSecret: '',
   CreemTestMode: false,
   CreemProducts: '[]',
-  PlisioApiKey: '',
-  PlisioSourceCurrency: 'USD',
-  PlisioMinTopUp: 1,
+  NowPaymentsEnabled: false,
+  NowPaymentsApiKey: '',
+  NowPaymentsIpnSecret: '',
+  NowPaymentsSandbox: false,
+  NowPaymentsMinTopUp: 1,
+  NowPaymentsFeePaidByUser: false,
+  NowPaymentsIsFixedRate: false,
 }
 
 function PaymentFixture(props: { values: PaymentValues }) {

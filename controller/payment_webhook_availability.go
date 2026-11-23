@@ -114,17 +114,21 @@ func isEpayWebhookEnabled() bool {
 	return isEpayTopUpEnabled()
 }
 
-func isPlisioTopUpEnabled() bool {
+func isNowPaymentsTopUpEnabled() bool {
 	if !isPaymentComplianceConfirmed() {
 		return false
 	}
-	return strings.TrimSpace(setting.PlisioApiKey) != ""
+	if !setting.NowPaymentsEnabled {
+		return false
+	}
+	return strings.TrimSpace(setting.NowPaymentsApiKey) != "" &&
+		isNowPaymentsWebhookConfigured()
 }
 
-func isPlisioWebhookConfigured() bool {
-	return strings.TrimSpace(setting.PlisioApiKey) != ""
+func isNowPaymentsWebhookConfigured() bool {
+	return strings.TrimSpace(setting.NowPaymentsIpnSecret) != ""
 }
 
-func isPlisioWebhookEnabled() bool {
-	return isPlisioTopUpEnabled()
+func isNowPaymentsWebhookEnabled() bool {
+	return isNowPaymentsTopUpEnabled()
 }

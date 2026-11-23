@@ -133,11 +133,11 @@ export function getPaymentIcon(
           style={{ color: PAYMENT_ICON_COLORS[PAYMENT_TYPES.WAFFO] }}
         />
       )
-    case PAYMENT_TYPES.PLISIO:
+    case PAYMENT_TYPES.NOWPAYMENTS:
       return (
         <CreditCard
           className={className}
-          style={{ color: PAYMENT_ICON_COLORS[PAYMENT_TYPES.PLISIO] }}
+          style={{ color: PAYMENT_ICON_COLORS[PAYMENT_TYPES.NOWPAYMENTS] }}
         />
       )
     case PAYMENT_TYPES.WAFFO_PANCAKE:

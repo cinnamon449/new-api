@@ -190,9 +190,13 @@ const paymentSchema = z.object({
   WaffoPancakeMerchantID: z.string(),
   WaffoPancakePrivateKey: z.string(),
   WaffoPancakeReturnURL: z.string(),
-  PlisioApiKey: z.string(),
-  PlisioSourceCurrency: z.string(),
-  PlisioMinTopUp: z.coerce.number().min(1),
+  NowPaymentsEnabled: z.boolean(),
+  NowPaymentsApiKey: z.string(),
+  NowPaymentsIpnSecret: z.string(),
+  NowPaymentsSandbox: z.boolean(),
+  NowPaymentsMinTopUp: z.coerce.number().min(1),
+  NowPaymentsFeePaidByUser: z.boolean(),
+  NowPaymentsIsFixedRate: z.boolean(),
 })
 
 type PaymentFormValues = z.infer<typeof paymentSchema>
@@ -477,9 +481,13 @@ export function PaymentSettingsSection({
       WaffoPancakeReturnURL: removeTrailingSlash(
         values.WaffoPancakeReturnURL.trim()
       ),
-      PlisioApiKey: values.PlisioApiKey.trim(),
-      PlisioSourceCurrency: values.PlisioSourceCurrency.trim() || 'USD',
-      PlisioMinTopUp: values.PlisioMinTopUp,
+      NowPaymentsEnabled: values.NowPaymentsEnabled,
+      NowPaymentsApiKey: values.NowPaymentsApiKey.trim(),
+      NowPaymentsIpnSecret: values.NowPaymentsIpnSecret.trim(),
+      NowPaymentsSandbox: values.NowPaymentsSandbox,
+      NowPaymentsMinTopUp: values.NowPaymentsMinTopUp,
+      NowPaymentsFeePaidByUser: values.NowPaymentsFeePaidByUser,
+      NowPaymentsIsFixedRate: values.NowPaymentsIsFixedRate,
     }
 
     const initial = {
@@ -530,10 +538,13 @@ export function PaymentSettingsSection({
       WaffoPancakeReturnURL: removeTrailingSlash(
         initialRef.current.WaffoPancakeReturnURL.trim()
       ),
-      PlisioApiKey: initialRef.current.PlisioApiKey.trim(),
-      PlisioSourceCurrency:
-        initialRef.current.PlisioSourceCurrency.trim() || 'USD',
-      PlisioMinTopUp: initialRef.current.PlisioMinTopUp,
+      NowPaymentsEnabled: initialRef.current.NowPaymentsEnabled,
+      NowPaymentsApiKey: initialRef.current.NowPaymentsApiKey.trim(),
+      NowPaymentsIpnSecret: initialRef.current.NowPaymentsIpnSecret.trim(),
+      NowPaymentsSandbox: initialRef.current.NowPaymentsSandbox,
+      NowPaymentsMinTopUp: initialRef.current.NowPaymentsMinTopUp,
+      NowPaymentsFeePaidByUser: initialRef.current.NowPaymentsFeePaidByUser,
+      NowPaymentsIsFixedRate: initialRef.current.NowPaymentsIsFixedRate,
     }
 
     const updates: Array<{ key: string; value: string | number | boolean }> = []
@@ -756,22 +767,22 @@ export function PaymentSettingsSection({
       updates.push({ key: 'WaffoPayMethods', value: sanitized.WaffoPayMethods })
     }
 
-    if (
-      sanitized.PlisioApiKey &&
-      sanitized.PlisioApiKey !== initial.PlisioApiKey
-    ) {
-      updates.push({ key: 'PlisioApiKey', value: sanitized.PlisioApiKey })
+    for (const key of [
+      'NowPaymentsEnabled',
+      'NowPaymentsSandbox',
+      'NowPaymentsMinTopUp',
+      'NowPaymentsFeePaidByUser',
+      'NowPaymentsIsFixedRate',
+    ] as const) {
+      if (sanitized[key] !== initial[key]) {
+        updates.push({ key, value: sanitized[key] })
+      }
     }
 
-    if (sanitized.PlisioSourceCurrency !== initial.PlisioSourceCurrency) {
-      updates.push({
-        key: 'PlisioSourceCurrency',
-        value: sanitized.PlisioSourceCurrency,
-      })
-    }
-
-    if (sanitized.PlisioMinTopUp !== initial.PlisioMinTopUp) {
-      updates.push({ key: 'PlisioMinTopUp', value: sanitized.PlisioMinTopUp })
+    for (const key of ['NowPaymentsApiKey', 'NowPaymentsIpnSecret'] as const) {
+      if (sanitized[key] && sanitized[key] !== initial[key]) {
+        updates.push({ key, value: sanitized[key] })
+      }
     }
 
     const hasWaffoPancakeChanges =
@@ -958,7 +969,7 @@ export function PaymentSettingsSection({
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
-                <TabsTrigger value='plisio'>Plisio</TabsTrigger>
+                <TabsTrigger value='nowpayments'>NowPayments</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
                 <TabsTrigger value='waffo'>Waffo</TabsTrigger>
               </TabsList>
@@ -1768,12 +1779,17 @@ export function PaymentSettingsSection({
               </div>
             </TabsContent>
 
-            <TabsContent value='plisio' className={paymentTabContentClassName}>
+            <TabsContent
+              value='nowpayments'
+              className={paymentTabContentClassName}
+            >
               <div className='space-y-4'>
                 <div>
-                  <h3 className='text-lg font-medium'>{t('Plisio Gateway')}</h3>
+                  <h3 className='text-lg font-medium'>
+                    {t('NowPayments Gateway')}
+                  </h3>
                   <p className='text-muted-foreground text-sm'>
-                    {t('Configuration for Plisio cryptocurrency payments')}
+                    {t('Configuration for NowPayments cryptocurrency payments')}
                   </p>
                 </div>
 
@@ -1785,7 +1801,7 @@ export function PaymentSettingsSection({
                     <li>
                       {t('Webhook URL:')}{' '}
                       <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
-                        {'<ServerAddress>/api/plisio/webhook'}
+                        {'<ServerAddress>/api/nowpayments/webhook'}
                       </code>
                     </li>
                     <li>
@@ -1793,20 +1809,48 @@ export function PaymentSettingsSection({
                         'Customers pay with Bitcoin, Ethereum, USDT and other cryptocurrencies'
                       )}
                     </li>
+                    <li>
+                      {t(
+                        'Set payment covering to 2% in the NowPayments dashboard to match the underpayment tolerance'
+                      )}
+                    </li>
                   </ul>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name='NowPaymentsEnabled'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Enable NowPayments gateway')}</FormLabel>
+                        <FormDescription>
+                          {t(
+                            'When off, NowPayments is hidden from the recharge page'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
 
                 <div className='grid gap-6 md:grid-cols-2'>
                   <FormField
                     control={form.control}
-                    name='PlisioApiKey'
+                    name='NowPaymentsApiKey'
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t('API Key')}</FormLabel>
                         <FormControl>
                           <Input
                             type='password'
-                            placeholder={t('Enter Plisio API key')}
+                            placeholder={t('Enter NowPayments API key')}
                             autoComplete='new-password'
                             {...field}
                             onChange={(event) =>
@@ -1815,7 +1859,9 @@ export function PaymentSettingsSection({
                           />
                         </FormControl>
                         <FormDescription>
-                          {t('Plisio secret key (leave blank unless updating)')}
+                          {t(
+                            'NowPayments API key (leave blank unless updating)'
+                          )}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1824,13 +1870,15 @@ export function PaymentSettingsSection({
 
                   <FormField
                     control={form.control}
-                    name='PlisioSourceCurrency'
+                    name='NowPaymentsIpnSecret'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('Source Currency')}</FormLabel>
+                        <FormLabel>{t('IPN Secret')}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder='USD'
+                            type='password'
+                            placeholder={t('Enter NowPayments IPN secret')}
+                            autoComplete='new-password'
                             {...field}
                             onChange={(event) =>
                               field.onChange(event.target.value)
@@ -1839,7 +1887,7 @@ export function PaymentSettingsSection({
                         </FormControl>
                         <FormDescription>
                           {t(
-                            'Fiat currency used to charge customers (converted to crypto at checkout)'
+                            'HMAC-SHA512 signing secret (leave blank unless updating)'
                           )}
                         </FormDescription>
                         <FormMessage />
@@ -1850,23 +1898,92 @@ export function PaymentSettingsSection({
 
                 <FormField
                   control={form.control}
-                  name='PlisioMinTopUp'
+                  name='NowPaymentsMinTopUp'
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t('Minimum top-up')}</FormLabel>
                       <FormControl>
                         <Input
                           type='number'
-                          step='0.01'
+                          step='1'
                           min={1}
                           {...safeNumberFieldProps(field)}
                         />
                       </FormControl>
                       <FormDescription>
-                        {t('Smallest amount users can recharge (Plisio)')}
+                        {t('Smallest amount users can recharge (NowPayments)')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='NowPaymentsSandbox'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Sandbox mode')}</FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Route requests to api-sandbox.nowpayments.io for testing'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='NowPaymentsFeePaidByUser'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Fee paid by user')}</FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Forward the NowPayments service fee to the customer instead of absorbing it'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='NowPaymentsIsFixedRate'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Fixed exchange rate')}</FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Lock the crypto/USD rate for the duration of the checkout window'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
                   )}
                 />
               </div>

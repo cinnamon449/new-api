@@ -21,7 +21,7 @@ import { describe, expect, test } from 'vitest'
 import { PAYMENT_TYPES } from '../constants'
 import {
   dispatchSelectedPayment,
-  isPlisioPayment,
+  isNowPaymentsPayment,
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
@@ -34,7 +34,7 @@ describe('payment type classification', () => {
     expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO_PANCAKE)).toBe(true)
     expect(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO)).toBe(false)
     expect(isStripePayment(PAYMENT_TYPES.STRIPE)).toBe(true)
-    expect(isPlisioPayment(PAYMENT_TYPES.PLISIO)).toBe(true)
+    expect(isNowPaymentsPayment(PAYMENT_TYPES.NOWPAYMENTS)).toBe(true)
   })
 })
 
@@ -58,8 +58,8 @@ describe('payment dispatch', () => {
           calls.push('pancake')
           return false
         },
-        plisio: async () => {
-          calls.push('plisio')
+        nowpayments: async () => {
+          calls.push('nowpayments')
           return false
         },
       }
@@ -82,7 +82,7 @@ describe('payment dispatch', () => {
           return true
         },
         waffoPancake: async () => false,
-        plisio: async () => false,
+        nowpayments: async () => false,
       }
     )
 
@@ -90,24 +90,24 @@ describe('payment dispatch', () => {
     expect(called).toBe(false)
   })
 
-  test('sends Plisio payments through the hosted invoice flow', async () => {
+  test('sends NowPayments payments through the hosted invoice flow', async () => {
     const calls: string[] = []
     const success = await dispatchSelectedPayment(
-      { name: 'Plisio', type: PAYMENT_TYPES.PLISIO },
+      { name: 'NowPayments', type: PAYMENT_TYPES.NOWPAYMENTS },
       120,
       null,
       {
         regular: async () => false,
         waffo: async () => false,
         waffoPancake: async () => false,
-        plisio: async (amount) => {
-          calls.push(`plisio:${amount}`)
+        nowpayments: async (amount) => {
+          calls.push(`nowpayments:${amount}`)
           return true
         },
       }
     )
 
     expect(success).toBe(true)
-    expect(calls).toEqual(['plisio:120'])
+    expect(calls).toEqual(['nowpayments:120'])
   })
 })

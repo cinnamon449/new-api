@@ -158,9 +158,13 @@ const BILLING_SECTIONS = [
           CreemWebhookSecret: settings.CreemWebhookSecret,
           CreemTestMode: settings.CreemTestMode,
           CreemProducts: settings.CreemProducts,
-          PlisioApiKey: settings.PlisioApiKey,
-          PlisioSourceCurrency: settings.PlisioSourceCurrency ?? 'USD',
-          PlisioMinTopUp: settings.PlisioMinTopUp ?? 1,
+          NowPaymentsEnabled: settings.NowPaymentsEnabled ?? false,
+          NowPaymentsApiKey: settings.NowPaymentsApiKey ?? '',
+          NowPaymentsIpnSecret: settings.NowPaymentsIpnSecret ?? '',
+          NowPaymentsSandbox: settings.NowPaymentsSandbox ?? false,
+          NowPaymentsMinTopUp: settings.NowPaymentsMinTopUp ?? 1,
+          NowPaymentsFeePaidByUser: settings.NowPaymentsFeePaidByUser ?? false,
+          NowPaymentsIsFixedRate: settings.NowPaymentsIsFixedRate ?? false,
         }}
         waffoDefaultValues={{
           WaffoEnabled: settings.WaffoEnabled ?? false,
