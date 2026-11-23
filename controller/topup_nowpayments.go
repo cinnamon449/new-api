@@ -100,6 +100,10 @@ type nowPaymentsPaymentEvent struct {
 // RequestNowPaymentsAmount returns the fiat price preview for a top-up amount,
 // using the shared top-up price model (same as Epay).
 func RequestNowPaymentsAmount(c *gin.Context) {
+	if !isNowPaymentsTopUpEnabled() {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "NowPayments top-up is not enabled"})
+		return
+	}
 	var req NowPaymentsPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})
@@ -129,6 +133,10 @@ func RequestNowPaymentsAmount(c *gin.Context) {
 // RequestNowPaymentsPay creates a NowPayments invoice and returns the hosted
 // invoice page where the buyer chooses a cryptocurrency and pays.
 func RequestNowPaymentsPay(c *gin.Context) {
+	if !isNowPaymentsTopUpEnabled() {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "NowPayments top-up is not enabled"})
+		return
+	}
 	var req NowPaymentsPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})
@@ -142,14 +150,8 @@ func RequestNowPaymentsPay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", getNowPaymentsMinTopup())})
 		return
 	}
-	if req.SuccessURL != "" && common.ValidateRedirectURL(req.SuccessURL) != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Success redirect URL is not in the trusted domain list"})
-		return
-	}
-	if req.CancelURL != "" && common.ValidateRedirectURL(req.CancelURL) != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Cancel redirect URL is not in the trusted domain list"})
-		return
-	}
+	successURL := trustedNowPaymentsReturnURL(c.Request.Context(), req.SuccessURL, "/console/log")
+	cancelURL := trustedNowPaymentsReturnURL(c.Request.Context(), req.CancelURL, "/console/topup")
 
 	id := c.GetInt("id")
 	if rejectInvalidTopUpQuota(c, id, req.Amount) {
@@ -197,7 +199,7 @@ func RequestNowPaymentsPay(c *gin.Context) {
 	// Invoice the cent-rounded price; the webhook requires NowPayments to echo
 	// exactly this amount back before crediting.
 	invoicePrice, _ := strconv.ParseFloat(strconv.FormatFloat(payMoney, 'f', 2, 64), 64)
-	invoiceURL, err := createNowPaymentsInvoice(c.Request.Context(), tradeNo, invoicePrice, req.SuccessURL, req.CancelURL, fmt.Sprintf("Top-up #%d", req.Amount))
+	invoiceURL, err := createNowPaymentsInvoice(c.Request.Context(), tradeNo, invoicePrice, successURL, cancelURL, fmt.Sprintf("Top-up #%d", req.Amount))
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("NowPayments 创建发票失败 user_id=%d trade_no=%s amount=%d error=%q", id, tradeNo, req.Amount, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
@@ -214,6 +216,22 @@ func RequestNowPaymentsPay(c *gin.Context) {
 	})
 }
 
+// trustedNowPaymentsReturnURL returns the requested checkout return page when
+// its host is in TRUSTED_REDIRECT_DOMAINS, and the default return path
+// otherwise. An untrusted page is never forwarded, but it does not block the
+// checkout, so a deployment that has not listed the portal host still takes
+// payments.
+func trustedNowPaymentsReturnURL(ctx context.Context, requested string, defaultSuffix string) string {
+	if requested == "" {
+		return paymentReturnPath(defaultSuffix)
+	}
+	if err := common.ValidateRedirectURL(requested); err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("NowPayments return URL rejected, using the default return path reason=%q", err.Error()))
+		return paymentReturnPath(defaultSuffix)
+	}
+	return requested
+}
+
 // createNowPaymentsInvoice calls POST /invoice and returns the hosted invoice
 // URL. Errors never include the API key or the provider response body.
 func createNowPaymentsInvoice(ctx context.Context, orderId string, priceAmount float64, successURL string, cancelURL string, description string) (string, error) {
@@ -221,13 +239,6 @@ func createNowPaymentsInvoice(ctx context.Context, orderId string, priceAmount f
 	if apiKey == "" {
 		return "", errors.New("NowPayments API key is not configured")
 	}
-	if successURL == "" {
-		successURL = paymentReturnPath("/console/log")
-	}
-	if cancelURL == "" {
-		cancelURL = paymentReturnPath("/console/topup")
-	}
-
 	body, err := common.Marshal(nowPaymentsInvoiceRequest{
 		PriceAmount:      priceAmount,
 		PriceCurrency:    "usd",
@@ -349,11 +360,14 @@ func NowPaymentsWebhook(c *gin.Context) {
 // arrived settles by exactly the rules an IPN would have used.
 func settleNowPaymentsEvent(ctx context.Context, event *nowPaymentsPaymentEvent, callerIP string) int {
 	orderId := event.OrderId
+	deadAttempt := event.PaymentStatus == "failed" || event.PaymentStatus == "expired" || event.PaymentStatus == "refunded"
 
-	// Record the provider payment id and what actually landed on every event:
-	// NowPayments payments can only be looked up by payment_id, and the paid
-	// figure is what separates a stalled paid order from an abandoned checkout.
-	if event.PaymentId != 0 {
+	// Record the provider payment id and what actually landed: NowPayments
+	// payments can only be looked up by payment_id, and the paid figure is what
+	// separates a stalled paid order from an abandoned checkout. One invoice can
+	// carry several payment attempts, so a dead attempt never replaces the id of
+	// a live one.
+	if event.PaymentId != 0 && !deadAttempt {
 		if err := model.SetNowPaymentsPaymentId(orderId, strconv.FormatInt(event.PaymentId, 10)); err != nil {
 			logger.LogError(ctx, fmt.Sprintf("NowPayments failed to record payment id trade_no=%s payment_id=%d error=%q", orderId, event.PaymentId, err.Error()))
 		}
@@ -376,6 +390,7 @@ func settleNowPaymentsEvent(ctx context.Context, event *nowPaymentsPaymentEvent,
 			return creditNowPaymentsOrder(ctx, event, callerIP)
 		}
 		logger.LogWarn(ctx, fmt.Sprintf("NowPayments underpaid beyond tolerance, left pending trade_no=%s pay_amount=%v actually_paid=%v", orderId, event.PayAmount, event.ActuallyPaid))
+		reopenNowPaymentsOrder(ctx, orderId)
 		return http.StatusOK
 	case "failed", "expired", "refunded":
 		LockOrder(orderId)
@@ -389,10 +404,22 @@ func settleNowPaymentsEvent(ctx context.Context, event *nowPaymentsPaymentEvent,
 		return http.StatusOK
 	case "waiting", "confirming", "confirmed", "sending":
 		logger.LogInfo(ctx, fmt.Sprintf("NowPayments awaiting confirmation trade_no=%s status=%s", orderId, event.PaymentStatus))
+		reopenNowPaymentsOrder(ctx, orderId)
 		return http.StatusOK
 	default:
 		logger.LogWarn(ctx, fmt.Sprintf("NowPayments unknown status ignored trade_no=%s status=%s", orderId, event.PaymentStatus))
 		return http.StatusOK
+	}
+}
+
+// reopenNowPaymentsOrder returns an order failed by an earlier expired attempt
+// to pending when a new payment on the same invoice is in progress, so the
+// reconcile task keeps watching it.
+func reopenNowPaymentsOrder(ctx context.Context, orderId string) {
+	LockOrder(orderId)
+	defer UnlockOrder(orderId)
+	if err := model.ReopenNowPaymentsTopUp(orderId); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("NowPayments failed to reopen order trade_no=%s error=%q", orderId, err.Error()))
 	}
 }
 

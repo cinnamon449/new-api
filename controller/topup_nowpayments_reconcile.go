@@ -5,6 +5,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/bytedance/gopkg/util/gopool"
 )
 
@@ -54,7 +56,7 @@ func runNowPaymentsReconcileOnce() {
 		return
 	}
 	defer nowPaymentsReconcileRunning.Store(false)
-	if !isNowPaymentsWebhookEnabled() {
+	if !isNowPaymentsWebhookEnabled() || strings.TrimSpace(setting.NowPaymentsApiKey) == "" {
 		return
 	}
 	ctx := context.Background()

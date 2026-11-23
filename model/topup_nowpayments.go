@@ -40,15 +40,26 @@ func CreateNowPaymentsTopUp(topUp *TopUp) error {
 	})
 }
 
-// SetNowPaymentsPaymentId records the provider payment id on any IPN,
-// including non-final statuses. The first id recorded is kept.
+// SetNowPaymentsPaymentId records the provider payment id the reconcile task
+// polls. One invoice can carry several payment attempts, so the latest live
+// attempt replaces an earlier one; callers skip expired or failed attempts so
+// a late IPN for a dead attempt cannot displace a live one.
 func SetNowPaymentsPaymentId(tradeNo string, paymentId string) error {
 	if tradeNo == "" || paymentId == "" {
 		return nil
 	}
 	return DB.Model(&NowPaymentsPayment{}).
-		Where("trade_no = ? AND payment_id = ?", tradeNo, "").
+		Where("trade_no = ? AND payment_id <> ?", tradeNo, paymentId).
 		Update("payment_id", paymentId).Error
+}
+
+// ReopenNowPaymentsTopUp returns a NowPayments order that an expired or failed
+// payment attempt marked failed to pending, because the customer started a new
+// payment on the same invoice. Other orders and statuses are left unchanged.
+func ReopenNowPaymentsTopUp(tradeNo string) error {
+	return DB.Model(&TopUp{}).
+		Where("trade_no = ? AND payment_provider = ? AND status = ?", tradeNo, PaymentProviderNowPayments, common.TopUpStatusFailed).
+		Update("status", common.TopUpStatusPending).Error
 }
 
 // SetNowPaymentsPaidAmount records funds the provider reports as received. It
@@ -66,15 +77,19 @@ func SetNowPaymentsPaidAmount(tradeNo string, paidAmount float64) error {
 // [newerThan, olderThan] whose customer reached a payment (a payment id was
 // recorded), oldest first.
 func GetPendingNowPaymentsOrders(newerThan int64, olderThan int64, limit int) ([]NowPaymentsPayment, error) {
+	// Filter on a recorded payment before the limit: abandoned invoices never
+	// get a payment id and stay pending, so they must not fill the batch.
+	withPayment := DB.Model(&NowPaymentsPayment{}).Select("trade_no").Where("payment_id <> ?", "")
 	var tradeNos []string
 	err := DB.Model(&TopUp{}).
 		Where("payment_provider = ? AND status = ? AND create_time BETWEEN ? AND ?", PaymentProviderNowPayments, common.TopUpStatusPending, newerThan, olderThan).
+		Where("trade_no IN (?)", withPayment).
 		Order("create_time asc").Limit(limit).Pluck("trade_no", &tradeNos).Error
 	if err != nil || len(tradeNos) == 0 {
 		return nil, err
 	}
 	var payments []NowPaymentsPayment
-	err = DB.Where("trade_no IN ? AND payment_id <> ?", tradeNos, "").Find(&payments).Error
+	err = DB.Where("trade_no IN ?", tradeNos).Find(&payments).Error
 	return payments, err
 }
 
@@ -105,7 +120,9 @@ func RechargeNowPayments(tradeNo string, priceAmount decimal.Decimal, callerIP s
 			alreadyDone = true
 			return nil
 		}
-		if topUp.Status != common.TopUpStatusPending {
+		// A failed order was failed only by an expired or failed payment attempt;
+		// a later attempt on the same invoice that is paid still settles it.
+		if topUp.Status != common.TopUpStatusPending && topUp.Status != common.TopUpStatusFailed {
 			return ErrTopUpStatusInvalid
 		}
 		quota, err = common.WalletQuotaFromDecimalStrict(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))

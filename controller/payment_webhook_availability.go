@@ -129,6 +129,9 @@ func isNowPaymentsWebhookConfigured() bool {
 	return strings.TrimSpace(setting.NowPaymentsIpnSecret) != ""
 }
 
+// isNowPaymentsWebhookEnabled deliberately does not follow the gateway
+// toggle or compliance: those stop new invoices, while invoices already issued
+// must still settle when their payment arrives.
 func isNowPaymentsWebhookEnabled() bool {
-	return isNowPaymentsTopUpEnabled()
+	return isNowPaymentsWebhookConfigured()
 }

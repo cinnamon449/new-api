@@ -21,6 +21,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -225,11 +226,74 @@ func TestNowPaymentsWebhookRecordsProgressMonotonically(t *testing.T) {
 	assert.Equal(t, 3.0, payment.PaidAmount)
 }
 
-func TestNowPaymentsWebhookRejectedWhenDisabled(t *testing.T) {
+// Turning the gateway off stops new invoices, never settlement of invoices
+// already issued; only a missing IPN secret refuses callbacks.
+func TestNowPaymentsWebhookSettlesWhileGatewayDisabled(t *testing.T) {
 	f := newNowPaymentsFixture(t, 0, 5, model.PaymentProviderNowPayments)
 	setting.NowPaymentsEnabled = false
+	payment := operation_setting.GetPaymentSetting()
+	payment.ComplianceConfirmed = false
 	body := nowPaymentsEventBody(f.order.TradeNo, "finished", `5`, 5, 5)
-	assert.Equal(t, http.StatusForbidden, postNowPaymentsWebhook(body, signNowPaymentsBody(body, nowPaymentsTestSecret)))
+	sig := signNowPaymentsBody(body, nowPaymentsTestSecret)
+	require.Equal(t, http.StatusOK, postNowPaymentsWebhook(body, sig))
+	require.NoError(t, f.db.First(&f.order, f.order.Id).Error)
+	assert.Equal(t, common.TopUpStatusSuccess, f.order.Status)
+
+	setting.NowPaymentsIpnSecret = ""
+	assert.Equal(t, http.StatusForbidden, postNowPaymentsWebhook(body, sig))
+}
+
+// One invoice can carry several payment attempts. An expired first attempt
+// fails the order, but a later attempt must reopen and settle it, and a late
+// IPN for the dead attempt must not displace the live payment id.
+func TestNowPaymentsRetryAfterExpiredAttemptSettles(t *testing.T) {
+	f := newNowPaymentsFixture(t, 0, 5, model.PaymentProviderNowPayments)
+	post := func(paymentId int, status string, paid float64) {
+		body := strings.Replace(nowPaymentsEventBody(f.order.TradeNo, status, `5`, 5, paid), `"payment_id":4242`, fmt.Sprintf(`"payment_id":%d`, paymentId), 1)
+		require.Equal(t, http.StatusOK, postNowPaymentsWebhook(body, signNowPaymentsBody(body, nowPaymentsTestSecret)), status)
+	}
+	orderStatus := func() string {
+		require.NoError(t, f.db.First(&f.order, f.order.Id).Error)
+		return f.order.Status
+	}
+	paymentId := func() string {
+		var payment model.NowPaymentsPayment
+		require.NoError(t, f.db.Where("trade_no = ?", f.order.TradeNo).First(&payment).Error)
+		return payment.PaymentId
+	}
+
+	post(1001, "waiting", 0)
+	post(1001, "expired", 0)
+	assert.Equal(t, common.TopUpStatusFailed, orderStatus())
+
+	post(1002, "waiting", 0)
+	assert.Equal(t, common.TopUpStatusPending, orderStatus(), "a new attempt reopens the order for reconciliation")
+	assert.Equal(t, "1002", paymentId())
+	post(1001, "expired", 0)
+	assert.Equal(t, "1002", paymentId(), "a late IPN for the dead attempt keeps the live id")
+	assert.Equal(t, common.TopUpStatusFailed, orderStatus())
+
+	post(1002, "finished", 5)
+	assert.Equal(t, common.TopUpStatusSuccess, orderStatus(), "the paid retry settles even after the order was failed")
+	require.NoError(t, f.db.First(&f.user, f.user.Id).Error)
+	assert.Equal(t, int(5*common.QuotaPerUnit), f.user.Quota)
+}
+
+// Abandoned invoices never get a payment id and stay pending; they must not
+// fill the reconcile batch ahead of a paid order whose IPN was missed.
+func TestNowPaymentsReconcileBatchSkipsAbandonedCheckouts(t *testing.T) {
+	f := newNowPaymentsFixture(t, 0, 5, model.PaymentProviderNowPayments)
+	old := time.Now().Add(-2 * time.Hour).Unix()
+	abandoned := model.TopUp{UserId: f.user.Id, TradeNo: "qa-nowpayments-abandoned", Amount: 5, Money: 5, PaymentMethod: model.PaymentMethodNowPayments, PaymentProvider: model.PaymentProviderNowPayments, CreateTime: old, Status: common.TopUpStatusPending}
+	require.NoError(t, model.CreateNowPaymentsTopUp(&abandoned))
+	require.NoError(t, f.db.Model(&model.TopUp{}).Where("id = ?", f.order.Id).Update("create_time", old+60).Error)
+	require.NoError(t, model.SetNowPaymentsPaymentId(f.order.TradeNo, "4242"))
+
+	pending, err := model.GetPendingNowPaymentsOrders(old-1, time.Now().Unix(), 1)
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	assert.Equal(t, f.order.TradeNo, pending[0].TradeNo)
+	assert.Equal(t, "4242", pending[0].PaymentId)
 }
 
 // A missed IPN must still settle: the reconcile task reads the payment back by
@@ -291,39 +355,63 @@ func TestNowPaymentsCheckoutRejectsUnsafeRequestsBeforeInvoice(t *testing.T) {
 	db := setupManageUserTestDB(t)
 	require.NoError(t, db.AutoMigrate(&model.TopUp{}, &model.NowPaymentsPayment{}))
 	enableNowPaymentsForTest(t)
-	oldDomains := constant.TrustedRedirectDomains
-	constant.TrustedRedirectDomains = []string{"interapi.test"}
-	t.Cleanup(func() { constant.TrustedRedirectDomains = oldDomains })
 	oldClient := nowPaymentsHTTPClient
 	nowPaymentsHTTPClient = &http.Client{Transport: nowPaymentsTestTransport{err: errors.New("no invoice may be requested")}}
 	t.Cleanup(func() { nowPaymentsHTTPClient = oldClient })
 
 	limited := model.User{Username: "qa-nowpayments-limit", AffCode: "qa-nowpayments-limit", Quota: common.MaxWalletQuota}
 	require.NoError(t, db.Create(&limited).Error)
-	ordinary := model.User{Username: "qa-nowpayments-redirect", AffCode: "qa-nowpayments-redirect"}
+	ordinary := model.User{Username: "qa-nowpayments-ordinary", AffCode: "qa-nowpayments-ordinary"}
 	require.NoError(t, db.Create(&ordinary).Error)
 
-	call := func(handler gin.HandlerFunc, userId int, body string) string {
-		recorder := httptest.NewRecorder()
-		ctx, _ := gin.CreateTestContext(recorder)
-		ctx.Request = httptest.NewRequest(http.MethodPost, "/api/user/nowpayments/pay", strings.NewReader(body))
-		ctx.Request.Header.Set("Content-Type", "application/json")
-		ctx.Set("id", userId)
-		handler(ctx)
-		return recorder.Body.String()
-	}
-	for _, handler := range []gin.HandlerFunc{RequestNowPaymentsAmount, RequestNowPaymentsPay} {
+	handlers := []gin.HandlerFunc{RequestNowPaymentsAmount, RequestNowPaymentsPay}
+	for _, handler := range handlers {
 		for _, amount := range []int64{getNowPaymentsMinTopup(), math.MaxInt64} {
-			assert.Contains(t, call(handler, limited.Id, fmt.Sprintf(`{"amount":%d,"payment_method":"nowpayments"}`, amount)), `"message":"error"`)
+			assert.Contains(t, callNowPaymentsCheckout(handler, limited.Id, fmt.Sprintf(`{"amount":%d,"payment_method":"nowpayments"}`, amount)), `"message":"error"`)
 		}
 	}
-	for _, field := range []string{"success_url", "cancel_url"} {
-		response := call(RequestNowPaymentsPay, ordinary.Id, fmt.Sprintf(`{"amount":5,"payment_method":"nowpayments",%q:"https://evil.example/return"}`, field))
-		assert.Contains(t, response, "not in the trusted domain list")
+	// A disabled gateway or unconfirmed compliance refuses new checkouts.
+	payment := operation_setting.GetPaymentSetting()
+	for _, disable := range []func(){
+		func() { setting.NowPaymentsEnabled = false },
+		func() { payment.ComplianceConfirmed = false },
+	} {
+		enableNowPaymentsForTest(t)
+		disable()
+		for _, handler := range handlers {
+			assert.Contains(t, callNowPaymentsCheckout(handler, ordinary.Id, `{"amount":5,"payment_method":"nowpayments"}`), "NowPayments top-up is not enabled")
+		}
 	}
 	var orders int64
 	require.NoError(t, db.Model(&model.TopUp{}).Count(&orders).Error)
 	assert.Zero(t, orders, "rejected checkouts must not create orders")
+}
+
+// An untrusted return page is never sent to NowPayments, but it must not block
+// the checkout either: the default return path is used instead.
+func TestTrustedNowPaymentsReturnURL(t *testing.T) {
+	oldDomains, oldAddress := constant.TrustedRedirectDomains, system_setting.ServerAddress
+	constant.TrustedRedirectDomains = []string{"interapi.test"}
+	system_setting.ServerAddress = "https://api.interapi.test"
+	t.Cleanup(func() { constant.TrustedRedirectDomains, system_setting.ServerAddress = oldDomains, oldAddress })
+	for _, tc := range []struct{ requested, want string }{
+		{requested: "https://interapi.test/dashboard/billing", want: "https://interapi.test/dashboard/billing"},
+		{requested: "https://evil.example/return", want: "https://api.interapi.test/console/log"},
+		{requested: "javascript:alert(1)", want: "https://api.interapi.test/console/log"},
+		{requested: "", want: "https://api.interapi.test/console/log"},
+	} {
+		assert.Equal(t, tc.want, trustedNowPaymentsReturnURL(context.Background(), tc.requested, "/console/log"), tc.requested)
+	}
+}
+
+func callNowPaymentsCheckout(handler gin.HandlerFunc, userId int, body string) string {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/user/nowpayments/pay", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("id", userId)
+	handler(ctx)
+	return recorder.Body.String()
 }
 
 // Admin-console saves arrive as option strings; every NowPayments setting must
